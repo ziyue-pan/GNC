@@ -1,0 +1,64 @@
+
+// 最顶层的语法规则
+gnalc = { external_declaration* }
+
+external_declaration = {
+    function
+}
+
+// 定义一个函数的语法规则
+// 例:
+//  int main() {
+//      return 0;
+//  }
+function = {
+    data_type ~ identifier ~ function_parameter_list ~ "{"
+        ~ statement*
+    ~ "}"
+}
+
+
+// 标识符
+identifier = @{ (ASCII_ALPHA ~ ASCII_ALPHANUMERIC*) }
+
+// 类型
+data_type = { "int" }
+
+
+
+
+// 函数参数表
+function_parameter_list = {
+    "(" ~ (none_function_parameter) ~ ")"
+}
+
+// function_parameter_list = {
+//     open_brace
+//         ~ (none_function_parameter | function_parameter ~ (comma ~ function_parameter)* )
+//     ~ close_brace
+// }
+
+none_function_parameter = { WHITESPACE | "" }
+
+statement = {
+    return_statement ~ ";"
+}
+
+return_statement = { "return" ~ expression }
+
+expression = {
+    int_literal
+}
+
+
+
+int_literal = { dec_literal | hex_literal | oct_literal }
+dec_literal = @{ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+hex_literal = @{ ^"0x" ~ ASCII_ALPHANUMERIC+ }
+oct_literal = @{ "0" ~ ASCII_ALPHANUMERIC+ }
+
+WHITESPACE = _{ " " | "\n" | "\r" }
+COMMENT = _{
+    ("/*" ~ (!"*/" ~ ANY)* ~ "*/") // Block comment
+    | ("//" ~ (!"\n" ~ ANY)* ~ "\n") // Line comment
+}
