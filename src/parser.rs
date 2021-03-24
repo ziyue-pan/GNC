@@ -31,6 +31,13 @@ pub enum GnalcAST {
 }
 
 pub fn parse(source_path: &str) -> Vec<GnalcAST> {
+    let split = source_path.split(".");
+    let split = split.collect::<Vec<&str>>();
+
+    if split.len() == 0 || split[split.len() - 1] != "c" {
+        panic!("你不配");
+    }
+
     let mut source_file: File = File::open(source_path).expect("Unable to open source file!");
     let mut source_content: String = String::new();
     source_file.read_to_string(&mut source_content).expect("Unable to read the file!");
