@@ -30,7 +30,6 @@ pub enum GnalcAST {
     IntLiteral(i32),
 }
 
-
 pub fn parse(source_path: &str) -> Vec<GnalcAST> {
     let mut source_file: File = File::open(source_path).expect("Unable to open source file!");
     let mut source_content: String = String::new();
@@ -57,7 +56,8 @@ fn visit_gnalc(pair: Pair<'_, Rule>, ast: &mut Vec<GnalcAST>) {
                     visit_external_declaration(external_declaration, ast);
                 }
             }
-            _ => { panic!("[ERROR] unexpected token while parsing the given program"); }
+
+            _ => { }
         }
     }
 }
@@ -120,7 +120,7 @@ fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GnalcA
         match token.as_rule() {
             Rule::expression => {
                 let return_expression = visit_expression(token);
-                func_statements.push(return_expression);
+                func_statements.push(GnalcAST::ReturnStatement(Box::new(return_expression)));
             }
             _ => { panic!("[ERROR] unexpected token while parsing return statement"); }
         }

@@ -1,6 +1,10 @@
 
 // 最顶层的语法规则
-gnalc = { external_declaration* }
+gnalc = {
+    SOI
+    ~ external_declaration*
+    ~EOI
+}
 
 external_declaration = {
     function

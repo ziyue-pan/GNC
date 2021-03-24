@@ -13,6 +13,7 @@ use inkwell::context::Context;
 
 mod parser;
 mod codegen;
+mod checker;
 
 use codegen::CodeGen;
 
@@ -30,6 +31,8 @@ fn main() {
         // TODO(zc): 在parse前检测文件后缀是否为.c
 
         let ast = parser::parse(file_path);
+
+        checker::check(&ast);
 
         let context = Context::create();
         let code_gen = CodeGen::new(&context, file_path);
@@ -50,6 +53,9 @@ mod tests {
         let file_path = "./test/basic.c";
 
         let ast = parser::parse(file_path);
+
+        checker::check(&ast);
+
         let context = Context::create();
         let code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
