@@ -28,8 +28,7 @@ fn main() {
     let app_gnalcc = app.clone().get_matches();
 
     if let Some(file_path) = app_gnalcc.value_of("FILE") {
-        // TODO(zc): 在parse前检测文件后缀是否为.c
-
+        
         let ast = parser::parse(file_path);
 
         checker::check(&ast);
