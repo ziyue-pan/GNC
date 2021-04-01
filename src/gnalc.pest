@@ -1,4 +1,3 @@
-
 // 最顶层的语法规则
 gnalc = {
     SOI
@@ -50,12 +49,25 @@ statement = {
 
 return_statement = { "return" ~ expression }
 
+// 表达式
 expression = {
-    int_literal
+    unary_expression
 }
 
+// 一元操作运算符
+unary_expression = {
+    int_literal |
+    negative_unary |
+    logical_not_unary |
+    bitwise_complement_unary
+}
+
+negative_unary = { "-" ~ unary_expression }
+logical_not_unary = { "~" ~ unary_expression }
+bitwise_complement_unary = { "!" ~ unary_expression }
 
 
+// 字面量
 int_literal = { dec_literal | hex_literal | oct_literal }
 dec_literal = @{ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
 hex_literal = @{ ^"0x" ~ ASCII_ALPHANUMERIC+ }

@@ -19,25 +19,25 @@ pub struct GnalcParameter {
     param_name: String,
 }
 
-pub enum GnalcExpression {
+pub enum GnalcStatement {
     Return(String),
+}
+
+pub enum UnaryOperator {
+    UnaryMinus,
+    LogicalNot,
+    BitwiseComplement,
 }
 
 pub enum GnalcAST {
     // Function AST: return type, name, parameter list and code block
     Function(GnalcType, String, Vec<GnalcParameter>, Vec<GnalcAST>),
     ReturnStatement(Box<GnalcAST>),
+    UnaryExpression(UnaryOperator, Box(GnalcAST)),
     IntLiteral(i32),
 }
 
 pub fn parse(source_path: &str) -> Vec<GnalcAST> {
-    let split = source_path.split(".");
-    let split = split.collect::<Vec<&str>>();
-
-    if split.len() == 0 || split[split.len() - 1] != "c" {
-        panic!("你不配");
-    }
-
     let mut source_file: File = File::open(source_path).expect("Unable to open source file!");
     let mut source_content: String = String::new();
     source_file.read_to_string(&mut source_content).expect("Unable to read the file!");
@@ -64,7 +64,7 @@ fn visit_gnalc(pair: Pair<'_, Rule>, ast: &mut Vec<GnalcAST>) {
                 }
             }
 
-            _ => { }
+            _ => {}
         }
     }
 }
@@ -138,9 +138,9 @@ fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GnalcA
 fn visit_expression(pair: Pair<'_, Rule>) -> GnalcAST {
     for token in pair.into_inner() {
         match token.as_rule() {
-            Rule::int_literal => {
-                let int_literal = token.as_str().to_string().parse::<i32>().unwrap();
-                return GnalcAST::IntLiteral(int_literal);
+            Rule::unary_expression => {
+                return visit_unary(token);
+
                 // match token.as_str().to_string().parse::<i32>() {
                 //     Ok(int_literal) => GnalcAST::IntLiteral(int_literal),
                 //     Err(E) => panic!("[ERROR] unexpected token while parsing int literal"),
@@ -152,6 +152,21 @@ fn visit_expression(pair: Pair<'_, Rule>) -> GnalcAST {
     panic!("[ERROR] missing token while parsing expressions");
 }
 
+fn visit_unary(pair: Pair<'_, Rule>) -> GnalcAST {
+    for token in pair.into_inner() {
+        match token.as_rule() {
+            Rule::int_literal => {
+                let int_literal = token.as_str().to_string().parse::<i32>().unwrap();
+                return GnalcAST::IntLiteral(int_literal);
+            }
+            Rule::negative_unary => {
+
+            }
+            _ => { panic!("[ERROR] unexpected token while parsing expressions {}", token); }
+        }
+    }
+    panic!("[ERROR] missing unary while parsing expressions");
+}
 
 
 
