@@ -7,7 +7,7 @@ use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, C
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
 
-
+// define global context for LLVM code generator
 pub struct CodeGen<'ctx> {
     source_path: &'ctx str,
     module_name: String,

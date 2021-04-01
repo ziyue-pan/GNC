@@ -59,8 +59,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_basic_parse() {
-        let file_path = "./test/basic.c";
+    fn test_basic() {
+        let file_path = "./test/basic/basic.c";
+
+        let ast = parser::parse(file_path);
+
+        checker::check(&ast);
+
+        let context = Context::create();
+        let code_gen = CodeGen::new(&context, file_path);
+        code_gen.gen(&ast);
+    }
+
+    #[test]
+    fn test_unary() {
+        let file_path = "./test/unary/unary.c";
 
         let ast = parser::parse(file_path);
 

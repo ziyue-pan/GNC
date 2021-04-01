@@ -22,7 +22,8 @@ function = {
 
 
 // 标识符
-identifier = @{ (ASCII_ALPHA ~ ASCII_ALPHANUMERIC*) }
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
 
 // 类型
 data_type = { "int" }
@@ -56,7 +57,8 @@ return_statement = { "return" ~ expression }
 
 // 表达式
 expression = {
-    unary_expression
+    unary_expression |
+    identifier
 }
 
 // 一元操作运算符
@@ -67,9 +69,11 @@ unary_expression = {
     bitwise_complement_unary
 }
 
-negative_unary = { "-" ~ unary_expression }
-logical_not_unary = { "~" ~ unary_expression }
-bitwise_complement_unary = { "!" ~ unary_expression }
+negative_unary = { "-" ~ expression }
+logical_not_unary = { "~" ~ expression }
+bitwise_complement_unary = { "!" ~ expression }
+
+
 
 
 // 字面量

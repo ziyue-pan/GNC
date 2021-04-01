@@ -33,7 +33,7 @@ pub enum GnalcAST {
     // Function AST: return type, name, parameter list and code block
     Function(GnalcType, String, Vec<GnalcParameter>, Vec<GnalcAST>),
     ReturnStatement(Box<GnalcAST>),
-    UnaryExpression(UnaryOperator, Box(GnalcAST)),
+    UnaryExpression(UnaryOperator, Box<GnalcAST>),
     IntLiteral(i32),
 }
 
@@ -160,7 +160,16 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GnalcAST {
                 return GnalcAST::IntLiteral(int_literal);
             }
             Rule::negative_unary => {
-
+                let unary_expression = visit_expression(token);
+                return GnalcAST::UnaryExpression(UnaryOperator::UnaryMinus, Box::new(unary_expression))
+            }
+            Rule::logical_not_unary => {
+                let unary_expression = visit_expression(token);
+                return GnalcAST::UnaryExpression(UnaryOperator::LogicalNot, Box::new(unary_expression))
+            }
+            Rule::bitwise_complement_unary => {
+                let unary_expression = visit_expression(token);
+                return GnalcAST::UnaryExpression(UnaryOperator::BitwiseComplement, Box::new(unary_expression))
             }
             _ => { panic!("[ERROR] unexpected token while parsing expressions {}", token); }
         }
