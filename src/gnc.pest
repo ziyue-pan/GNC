@@ -1,5 +1,5 @@
 // 最顶层的语法规则
-gnalc = {
+gnc = {
     SOI
     ~ external_declaration*
     ~EOI

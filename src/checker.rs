@@ -1,15 +1,15 @@
-use parser::GnalcAST;
+use parser::GNCAST;
 use std::process::exit;
 use colored::Colorize;
 
-pub struct GnalcError {
+pub struct GNCError {
     pub code: i32,
     pub description: String,
 }
 
 
-pub fn check(ast: &Vec<GnalcAST>) {
-    let errors: Vec<GnalcError> = vec![];
+pub fn check(ast: &Vec<GNCAST>) {
+    let errors: Vec<GNCError> = vec![];
 
     check_main_exist(ast, &errors);
 
@@ -18,7 +18,7 @@ pub fn check(ast: &Vec<GnalcAST>) {
     }
 }
 
-pub fn prompt(err: &GnalcError) {
+pub fn prompt(err: &GNCError) {
     println!("{}{}{}{}",
              "[ERROR-".red().bold(),
              "]".red().bold(),
@@ -27,6 +27,6 @@ pub fn prompt(err: &GnalcError) {
 }
 
 
-fn check_main_exist(ast: &Vec<GnalcAST>, errors: &Vec<GnalcError>) {}
+fn check_main_exist(ast: &Vec<GNCAST>, errors: &Vec<GNCError>) {}
 
 

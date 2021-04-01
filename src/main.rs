@@ -17,24 +17,24 @@ mod codegen;
 mod checker;
 
 use codegen::CodeGen;
-use checker::GnalcError;
+use checker::GNCError;
 
 fn main() {
-    let mut app = App::new("gnalcc")
+    let mut app = App::new("gncc")
         .version("0.1.0")
         .author("iamNCJ ~ MartinNose ~ Ziyue")
-        .about("gnalc is going to fuck c-lang")
-        .arg(Arg::with_name("version").short("v").long("version").help("Show version of gnalcc"))
+        .about("gnc is going to fuck c-lang")
+        .arg(Arg::with_name("version").short("v").long("version").help("Show version of gncc"))
         .arg(Arg::with_name("FILE").short("c").help("File ready to be compiled").index(1));
 
-    let app_gnalcc = app.clone().get_matches();
+    let app_gncc = app.clone().get_matches();
 
-    if let Some(file_path) = app_gnalcc.value_of("FILE") {
+    if let Some(file_path) = app_gncc.value_of("FILE") {
         let split = file_path.split(".");
         let split = split.collect::<Vec<&str>>();
 
         if split.len() == 0 || split[split.len() - 1] != "c" {
-            checker::prompt(&GnalcError {
+            checker::prompt(&GNCError {
                 code: 0,
                 description: String::from("the source file extension must be `.c`!"),
             });

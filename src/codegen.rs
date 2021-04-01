@@ -1,7 +1,7 @@
 use inkwell::context::Context;
 use inkwell::module::Module;
 use std::path::{Path, PathBuf};
-use parser::{GnalcAST, GnalcType};
+use parser::{GNCAST, GNCType};
 use inkwell::types::FunctionType;
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
 use inkwell::OptimizationLevel;
@@ -32,15 +32,15 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
 
-    pub fn gen(&self, ast: &Vec<GnalcAST>) {
+    pub fn gen(&self, ast: &Vec<GNCAST>) {
         for node in ast {
             match node {
-                GnalcAST::Function(ref func_type,
+                GNCAST::Function(ref func_type,
                                    ref func_name,
                                    ref func_param,
                                    ref func_body) => {
                     let llvm_func_type = match func_type {
-                        GnalcType::Int => { self.context.i32_type().fn_type(&[], false) }
+                        GNCType::Int => { self.context.i32_type().fn_type(&[], false) }
                         _ => { self.context.i32_type().fn_type(&[], false) }
                     };
                     let func = self.module.add_function(func_name.as_str(), llvm_func_type, None);
@@ -82,11 +82,11 @@ impl<'ctx> CodeGen<'ctx> {
         machine.write_to_file(&self.module, FileType::Assembly, target_assembly_path.as_ref()).unwrap();
     }
 
-    fn gen_statement(&self, statement: &GnalcAST) {
+    fn gen_statement(&self, statement: &GNCAST) {
         match statement {
-            GnalcAST::ReturnStatement(ref ptr_to_expr) => {
+            GNCAST::ReturnStatement(ref ptr_to_expr) => {
                 match **ptr_to_expr {
-                    GnalcAST::IntLiteral(ref int_literal) => {
+                    GNCAST::IntLiteral(ref int_literal) => {
                         let i32_literal = self.context.i32_type().const_int(*int_literal as u64, true);
                         self.builder.build_return(Some(&i32_literal));
                     }

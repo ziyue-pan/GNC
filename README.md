@@ -1,6 +1,6 @@
-# GNALC 
+# GNC 
 
-**Gnalc** is the reverse of c-lang. It is intended for a better and more effective c language.
+**GNC** is **N**ot **C**. It is intended for a better and more effective c language.
 
 ## Basic Steps
 
