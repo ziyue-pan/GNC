@@ -10,6 +10,7 @@ use std::path::Path;
 use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Read;
+use std::process::Command;
 use inkwell::context::Context;
 
 mod parser;
@@ -69,6 +70,8 @@ mod tests {
         let context = Context::create();
         let code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
+
+        Command::new("sh").arg("-c").arg("llvm-dis basic.bc").output().expect("failed to execute process");
     }
 
     #[test]

@@ -90,7 +90,18 @@ impl<'ctx> CodeGen<'ctx> {
                         let i32_literal = self.context.i32_type().const_int(*int_literal as u64, true);
                         self.builder.build_return(Some(&i32_literal));
                     }
+
                     _ => {}
+                }
+            }
+            GNCAST::LocalDeclaration(ref data_type, ref identifier ) => {
+                match data_type {
+                    GNCType::Int => {
+                        self.builder.build_alloca(self.context.i32_type(), identifier);
+                    }
+                    _ => {
+                        panic!("Invalid Type")
+                    }
                 }
             }
             _ => {}
