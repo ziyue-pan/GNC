@@ -44,7 +44,12 @@ function_parameter_list = {
 none_function_parameter = { WHITESPACE | "" }
 
 statement = {
-    return_statement ~ ";"
+    return_statement ~ ";" |
+    variable_declaration ~ ";"
+}
+
+variable_declaration = {
+    data_type ~ identifier
 }
 
 return_statement = { "return" ~ expression }
