@@ -28,6 +28,8 @@ pub enum GnalcAST {
     Function(GnalcType, String, Vec<GnalcParameter>, Vec<GnalcAST>),
     ReturnStatement(Box<GnalcAST>),
     IntLiteral(i32),
+    LocalDeclaration(GnalcType, String),
+    //TODO GlobalDeclaration(GnalcType, String)
 }
 
 pub fn parse(source_path: &str) -> Vec<GnalcAST> {
@@ -117,10 +119,26 @@ fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GnalcAST>) {
     for token in pair.into_inner() {
         match token.as_rule() {
             Rule::return_statement => { visit_return_statement(token, func_statements); }
+            Rule::variable_decalaration => {visit_variable_declaration(token, func_statements)}
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
         }
     }
 }
+
+fn visit_variable_declaration(pair: Pair<'_, Rule>, func_statements: &mut Vec<GnalcAST>) {
+    let mut declare_type: GnalcType = GnalcType::Int;
+    let mut variable_name : String = String::new();
+
+    for token in pair.into_inner() {
+        match token.as_rule() {
+            Rule::data_type  => { declare_type  = visit_data_type(token); }
+            Rule::identifier => { variable_name = token.as_str().to_string(); }
+            _ => { panic!("[ERROR] unexpected token while parsing return statement"); }
+        }
+    }
+    func_statements.push(GnalcAST::LocalDeclaration(declare_type, variable_name));
+}
+
 
 fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GnalcAST>) {
     for token in pair.into_inner() {
@@ -133,7 +151,6 @@ fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GnalcA
         }
     }
 }
-
 
 fn visit_expression(pair: Pair<'_, Rule>) -> GnalcAST {
     for token in pair.into_inner() {
@@ -151,8 +168,6 @@ fn visit_expression(pair: Pair<'_, Rule>) -> GnalcAST {
     }
     panic!("[ERROR] missing token while parsing expressions");
 }
-
-
 
 
 
