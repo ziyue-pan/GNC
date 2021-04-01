@@ -7,7 +7,7 @@ use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, C
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
 
-
+// define global context for LLVM code generator
 pub struct CodeGen<'ctx> {
     source_path: &'ctx str,
     module_name: String,
@@ -59,27 +59,27 @@ impl<'ctx> CodeGen<'ctx> {
         llvm_bitcode_path.set_extension("bc");
         self.module.write_bitcode_to_path(llvm_bitcode_path.as_path());
 
-        // Target::initialize_native(&InitializationConfig::default()).expect("Failed to initialize native target");
-        //
-        // let triple = TargetMachine::get_default_triple();
-        // let cpu = TargetMachine::get_host_cpu_name().to_string();
-        // let features = TargetMachine::get_host_cpu_features().to_string();
-        //
-        // let target = Target::from_triple(&triple).unwrap();
-        // let machine = target
-        //     .create_target_machine(
-        //         &triple,
-        //         &cpu,
-        //         &features,
-        //         OptimizationLevel::None,
-        //         RelocMode::Default,
-        //         CodeModel::Default,
-        //     )
-        //     .unwrap();
-        //
-        // let mut target_assembly_path = PathBuf::from(self.source_path);
-        // target_assembly_path.set_extension("asm");
-        // machine.write_to_file(&self.module, FileType::Assembly, target_assembly_path.as_ref()).unwrap();
+        Target::initialize_native(&InitializationConfig::default()).expect("Failed to initialize native target");
+
+        let triple = TargetMachine::get_default_triple();
+        let cpu = TargetMachine::get_host_cpu_name().to_string();
+        let features = TargetMachine::get_host_cpu_features().to_string();
+
+        let target = Target::from_triple(&triple).unwrap();
+        let machine = target
+            .create_target_machine(
+                &triple,
+                &cpu,
+                &features,
+                OptimizationLevel::None,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .unwrap();
+
+        let mut target_assembly_path = PathBuf::from(self.source_path);
+        target_assembly_path.set_extension("asm");
+        machine.write_to_file(&self.module, FileType::Assembly, target_assembly_path.as_ref()).unwrap();
     }
 
     fn gen_statement(&self, statement: &GnalcAST) {

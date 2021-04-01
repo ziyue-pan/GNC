@@ -3,6 +3,7 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 extern crate inkwell;
+extern crate colored;
 
 use clap::{App, Arg};
 use std::path::Path;
@@ -16,6 +17,7 @@ mod codegen;
 mod checker;
 
 use codegen::CodeGen;
+use checker::GnalcError;
 
 fn main() {
     let mut app = App::new("gnalcc")
@@ -28,7 +30,16 @@ fn main() {
     let app_gnalcc = app.clone().get_matches();
 
     if let Some(file_path) = app_gnalcc.value_of("FILE") {
-        
+        let split = file_path.split(".");
+        let split = split.collect::<Vec<&str>>();
+
+        if split.len() == 0 || split[split.len() - 1] != "c" {
+            checker::prompt(&GnalcError {
+                code: 0,
+                description: String::from("the source file extension must be `.c`!"),
+            });
+        }
+
         let ast = parser::parse(file_path);
 
         checker::check(&ast);
@@ -48,8 +59,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_basic_parse() {
-        let file_path = "./test/basic.c";
+    fn test_basic() {
+        let file_path = "./test/basic/basic.c";
+
+        let ast = parser::parse(file_path);
+
+        checker::check(&ast);
+
+        let context = Context::create();
+        let code_gen = CodeGen::new(&context, file_path);
+        code_gen.gen(&ast);
+    }
+
+    #[test]
+    fn test_unary() {
+        let file_path = "./test/unary/unary.c";
 
         let ast = parser::parse(file_path);
 
