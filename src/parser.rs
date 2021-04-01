@@ -119,7 +119,7 @@ fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
     for token in pair.into_inner() {
         match token.as_rule() {
             Rule::return_statement => { visit_return_statement(token, func_statements); }
-            Rule::variable_decalaration => {visit_variable_declaration(token, func_statements)}
+            Rule::variable_declaration => {visit_variable_declaration(token, func_statements)}
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
         }
     }
