@@ -35,6 +35,8 @@ pub enum GNCAST {
     ReturnStatement(Box<GNCAST>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
     IntLiteral(i32),
+    LocalDeclaration(GNCType, String),
+    //TODO GlobalDeclaration(GNCType, String)
 }
 
 pub fn parse(source_path: &str) -> Vec<GNCAST> {
@@ -117,9 +119,24 @@ fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
     for token in pair.into_inner() {
         match token.as_rule() {
             Rule::return_statement => { visit_return_statement(token, func_statements); }
+            Rule::variable_decalaration => {visit_variable_declaration(token, func_statements)}
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
         }
     }
+}
+
+fn visit_variable_declaration(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
+    let mut declare_type: GNCType = GNCType::Int;
+    let mut variable_name : String = String::new();
+
+    for token in pair.into_inner() {
+        match token.as_rule() {
+            Rule::data_type  => { declare_type  = visit_data_type(token); }
+            Rule::identifier => { variable_name = token.as_str().to_string(); }
+            _ => { panic!("[ERROR] unexpected token while parsing return statement"); }
+        }
+    }
+    func_statements.push(GNCAST::LocalDeclaration(declare_type, variable_name));
 }
 
 fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
@@ -176,8 +193,6 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
     }
     panic!("[ERROR] missing unary while parsing expressions");
 }
-
-
 
 
 
