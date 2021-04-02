@@ -1,14 +1,11 @@
 int neg_unary() {
-    int a;
-    return -a;
+    return -1;
 }
 
 int not_unary() {
-    int a;
-    return ~a;
+    return ~2;
 }
 
 int complement_unary() {
-    int a;
-    return !a;
+    return !3;
 }

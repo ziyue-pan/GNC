@@ -153,15 +153,16 @@ fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST
 
 
 fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
+    println!("expression parsed: {}", pair);
     for token in pair.into_inner() {
+        println!("token parsed: {}", token);
         match token.as_rule() {
             Rule::unary_expression => {
                 return visit_unary(token);
-
-                // match token.as_str().to_string().parse::<i32>() {
-                //     Ok(int_literal) => GNCAST::IntLiteral(int_literal),
-                //     Err(E) => panic!("[ERROR] unexpected token while parsing int literal"),
-                // }
+            }
+            Rule::int_literal => {
+                let int_literal = token.as_str().to_string().parse::<i32>().unwrap();
+                return GNCAST::IntLiteral(int_literal);
             }
             _ => { panic!("[ERROR] unexpected token while parsing expressions {}", token); }
         }
@@ -170,23 +171,20 @@ fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
 }
 
 fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
+    println!("unary parsed: {}", pair);
     for token in pair.into_inner() {
         match token.as_rule() {
-            Rule::int_literal => {
-                let int_literal = token.as_str().to_string().parse::<i32>().unwrap();
-                return GNCAST::IntLiteral(int_literal);
-            }
             Rule::negative_unary => {
-                let unary_expression = visit_expression(token);
-                return GNCAST::UnaryExpression(UnaryOperator::UnaryMinus, Box::new(unary_expression))
+                let expression = visit_expression(token.into_inner().next().unwrap());
+                return GNCAST::UnaryExpression(UnaryOperator::UnaryMinus, Box::new(expression))
             }
             Rule::logical_not_unary => {
-                let unary_expression = visit_expression(token);
-                return GNCAST::UnaryExpression(UnaryOperator::LogicalNot, Box::new(unary_expression))
+                let expression = visit_expression(token.into_inner().next().unwrap());
+                return GNCAST::UnaryExpression(UnaryOperator::LogicalNot, Box::new(expression))
             }
             Rule::bitwise_complement_unary => {
-                let unary_expression = visit_expression(token);
-                return GNCAST::UnaryExpression(UnaryOperator::BitwiseComplement, Box::new(unary_expression))
+                let expression = visit_expression(token.into_inner().next().unwrap());
+                return GNCAST::UnaryExpression(UnaryOperator::BitwiseComplement, Box::new(expression))
             }
             _ => { panic!("[ERROR] unexpected token while parsing expressions {}", token); }
         }

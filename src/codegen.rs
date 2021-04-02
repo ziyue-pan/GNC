@@ -6,6 +6,7 @@ use inkwell::types::FunctionType;
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
+use inkwell::values::PointerValue;
 
 // define global context for LLVM code generator
 pub struct CodeGen<'ctx> {
@@ -17,6 +18,7 @@ pub struct CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
+
     pub fn new(context: &'ctx Context, source_path: &'ctx str) -> CodeGen<'ctx> {
         let module_name = Path::new(source_path).file_stem().unwrap().to_str().unwrap().to_string();
         let module = context.create_module(module_name.as_str());
@@ -90,7 +92,9 @@ impl<'ctx> CodeGen<'ctx> {
                         let i32_literal = self.context.i32_type().const_int(*int_literal as u64, true);
                         self.builder.build_return(Some(&i32_literal));
                     }
-
+                    GNCAST::UnaryExpression(ref unary_operation, ref expression) => {
+                        self.builder.build_return();
+                    }
                     _ => {}
                 }
             }
@@ -106,6 +110,10 @@ impl<'ctx> CodeGen<'ctx> {
             }
             _ => {}
         }
+    }
+
+    fn gen_expression(&self, expression: &GNCAST) -> PointerValue {
+
     }
 }
 

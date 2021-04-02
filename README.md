@@ -2,14 +2,12 @@
 
 **GNC** is **N**ot **C**. It is intended for a better and more effective c language.
 
-## Basic Steps
+## Grammar Features
 
-* [x] setup rust 
-* [x] pest frontend
-* [ ] llvm backend
-* [ ] grammar file (processing)
-* [ ] main function that returns an integer.
-* [ ] ...
+- [x] int main() ...
+- [x] declare local int variable
+- [ ] unary expression  
+
 
 ## Advanced Steps
 

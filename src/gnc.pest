@@ -58,12 +58,12 @@ return_statement = { "return" ~ expression }
 // 表达式
 expression = {
     unary_expression |
-    identifier
+    identifier |
+    int_literal
 }
 
 // 一元操作运算符
 unary_expression = {
-    int_literal |
     negative_unary |
     logical_not_unary |
     bitwise_complement_unary
