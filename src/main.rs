@@ -46,7 +46,7 @@ fn main() {
         checker::check(&ast);
 
         let context = Context::create();
-        let code_gen = CodeGen::new(&context, file_path);
+        let mut code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
     } else {
         app.print_help().unwrap();
@@ -68,7 +68,7 @@ mod tests {
         checker::check(&ast);
 
         let context = Context::create();
-        let code_gen = CodeGen::new(&context, file_path);
+        let mut code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
 
         Command::new("sh").arg("-c").arg("llvm-dis basic.bc").output().expect("failed to execute process");
@@ -83,7 +83,7 @@ mod tests {
         checker::check(&ast);
 
         let context = Context::create();
-        let code_gen = CodeGen::new(&context, file_path);
+        let mut code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
     }
 }

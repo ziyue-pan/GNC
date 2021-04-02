@@ -46,11 +46,11 @@ none_function_parameter = { WHITESPACE | "" }
 
 statement = {
     return_statement ~ ";" |
-    variable_declaration ~ ";"
+    data_type ~ ( declaration ~  ",")*  ~ declaration ~ ";"
 }
 
-variable_declaration = {
-    data_type ~ identifier
+declaration = {
+    identifier ~ ( "=" ~ expression ) ?
 }
 
 return_statement = { "return" ~ expression }

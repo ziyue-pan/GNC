@@ -9,6 +9,7 @@ use std::io::Read;
 struct GNCParser;
 
 
+#[derive(Clone, Copy)]
 pub enum GNCType {
     Void,
     Int,
@@ -35,8 +36,8 @@ pub enum GNCAST {
     ReturnStatement(Box<GNCAST>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
     IntLiteral(i32),
-    LocalDeclaration(GNCType, String),
-    //TODO GlobalDeclaration(GNCType, String)
+    Declaration(GNCType, String),
+    Assignment(String, Box<GNCAST>),
 }
 
 pub fn parse(source_path: &str) -> Vec<GNCAST> {
@@ -116,27 +117,36 @@ fn visit_function_parameter_list(pair: Pair<'_, Rule>, func_param_list: &mut Vec
 }
 
 fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
+    let mut data_type : GNCType = GNCType::Int;
+
     for token in pair.into_inner() {
         match token.as_rule() {
             Rule::return_statement => { visit_return_statement(token, func_statements); }
-            Rule::variable_declaration => {visit_variable_declaration(token, func_statements)}
+            Rule::data_type => { data_type = visit_data_type(token) }
+            Rule::declaration => {
+                visit_declaration(token, func_statements, data_type.clone())
+            }
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
         }
     }
 }
 
-fn visit_variable_declaration(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
-    let mut declare_type: GNCType = GNCType::Int;
+fn visit_declaration(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>, ty: GNCType) {
     let mut variable_name : String = String::new();
 
     for token in pair.into_inner() {
         match token.as_rule() {
-            Rule::data_type  => { declare_type  = visit_data_type(token); }
-            Rule::identifier => { variable_name = token.as_str().to_string(); }
+            Rule::identifier => {
+                variable_name = token.as_str().to_string();
+                func_statements.push(GNCAST::Declaration(ty.clone(), variable_name.clone()));
+            }
+            Rule::expression => {
+                func_statements.push(GNCAST::Assignment(variable_name.clone(), Box::new(visit_expression(token))));
+            }
             _ => { panic!("[ERROR] unexpected token while parsing return statement"); }
         }
     }
-    func_statements.push(GNCAST::LocalDeclaration(declare_type, variable_name));
+
 }
 
 fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
