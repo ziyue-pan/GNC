@@ -1,5 +1,6 @@
 int neg_unary() {
-    return -1;
+    int a = -2;
+    return a;
 }
 
 int not_unary() {

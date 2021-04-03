@@ -2,12 +2,13 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use parser::{GNCAST, GNCType};
+use parser::{GNCAST, GNCType, UnaryOperator};
 use inkwell::types::FunctionType;
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
+use inkwell::IntPredicate;
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
-use inkwell::values::PointerValue;
+use inkwell::values::{PointerValue, IntValue, InstructionOpcode};
 
 // define global context for LLVM code generator
 pub struct CodeGen<'ctx> {
@@ -103,53 +104,78 @@ impl<'ctx> CodeGen<'ctx> {
         panic!(identifier.to_string() + " not found!");
     }
 
+    fn save_ptr_val(&mut self, identifier: &String, ptr_val: PointerValue<'ctx>) {
+        match self.addr_map_stack.last_mut() {
+            Some(mut map) => { map.insert(identifier.to_string(), ptr_val); }
+            _ => {panic!(identifier.to_string() + " not found. Addr HashMap Stack overflow"); }
+        }
+    }
+
     fn gen_statement(&mut self, statement: &GNCAST) {
         match statement {
             GNCAST::ReturnStatement(ref ptr_to_expr) => {
-                match **ptr_to_expr {
-                    GNCAST::IntLiteral(ref int_literal) => {
-                        let i32_literal = self.context.i32_type().const_int(*int_literal as u64, true);
-                        self.builder.build_return(Some(&i32_literal));
-                    }
-                    GNCAST::UnaryExpression(ref unary_operation, ref expression) => {
-                        self.builder.build_return();
-                    }
-                    _ => {}
-                }
+                self.builder.build_return(Some(&self.gen_expression(ptr_to_expr)));
+//                match **ptr_to_expr {
+//                    GNCAST::IntLiteral(ref int_literal) => {
+//                        let i32_literal = self.context.i32_type().const_int(*int_literal as u64, true);
+//                        self.builder.build_return(Some(&i32_literal));
+//                    }
+//                    GNCAST::UnaryExpression(ref unary_operation, ref expression) => {
+//                        self.builder.build_return(Some(&self.gen_expression(expression)));
+//                    }
+//                    _ => {}
+//                }
             }
-            GNCAST::Declaration(ref data_type, ref identifier ) => {
+            GNCAST::Declaration(ref data_type, ref identifier) => {
                 match data_type {
                     GNCType::Int => {
                         let point_value = self.builder.build_alloca(self.context.i32_type(), identifier);
-//                        self.get_current_map().insert(identifier.to_string(), point_value);
-//                        match self.addr_map_stack.iter_mut().rev().next() {
-                        match self.addr_map_stack.last_mut() {
-                            Some(mut map) => { map.insert(identifier.to_string(), point_value); }
-                            _ => {panic!(identifier.to_string() + " not found. Addr HashMap Stack overflow"); }
-                        }
-
+                        self.save_ptr_val(identifier, point_value);
                     }
+                    // TODO More Types
                     _ => {
                         panic!("Invalid Type")
                     }
                 }
             }
             GNCAST::Assignment(ref identifier, ref ptr_to_expr) => {
-                match **ptr_to_expr {
-                    GNCAST::IntLiteral(ref int_literal) => {
-                        let i32_literal = self.context.i32_type().const_int(*int_literal as u64, true);
-
-                        self.builder.build_store(self.get_point_value(identifier), i32_literal);
-                    }
-                    _ => {}
-                }
+                self.builder.build_store(self.get_point_value(identifier), self.gen_expression(&*ptr_to_expr));
             }
-            _ => {}
+            _ => {
+                panic!("Invalid Statement");
+            }
         }
     }
 
-    fn gen_expression(&self, expression: &GNCAST) -> PointerValue {
-
+    fn gen_expression(&self, expression: &GNCAST) -> IntValue {
+        match expression {
+            GNCAST::Identifier(ref identifier) => {
+                return self.builder.build_load(self.get_point_value(identifier), "load_val").into_int_value();
+            }
+            GNCAST::IntLiteral(ref int_literal) => {
+                return self.context.i32_type().const_int(*int_literal as u64, true);
+            }
+            GNCAST::UnaryExpression(ref op, ref expr) => {
+                match op {
+                    UnaryOperator::UnaryMinus => {
+                        return self.gen_expression(&*expr).const_neg();
+                    }
+                    UnaryOperator::LogicalNot => {
+//                        return self.gen_expression(&*expr).const_not();
+                        let res = self.gen_expression(&*expr).const_int_compare(IntPredicate::EQ, self.context.i32_type().const_int(0 as u64, true)).const_cast(self.context.i32_type(), true).const_neg();
+                        res.print_to_stderr();
+                        return res;
+                    }
+                    UnaryOperator::BitwiseComplement => {
+                        return self.gen_expression(&*expr).const_not();
+                    }
+                    _ => {
+                        panic!("Invalid Expression Type");
+                    }
+                }
+            }
+            _ => {panic!("Invalid Expression Type")}
+        }
     }
 }
 

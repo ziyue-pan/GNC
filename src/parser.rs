@@ -36,6 +36,7 @@ pub enum GNCAST {
     ReturnStatement(Box<GNCAST>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
     IntLiteral(i32),
+    Identifier(String),
     Declaration(GNCType, String),
     Assignment(String, Box<GNCAST>),
 }
@@ -173,6 +174,9 @@ fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
             Rule::int_literal => {
                 let int_literal = token.as_str().to_string().parse::<i32>().unwrap();
                 return GNCAST::IntLiteral(int_literal);
+            }
+            Rule::identifier => {
+                return GNCAST::Identifier(token.as_str().to_string());
             }
             _ => { panic!("[ERROR] unexpected token while parsing expressions {}", token); }
         }

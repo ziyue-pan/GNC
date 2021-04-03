@@ -70,8 +70,8 @@ unary_expression = {
 }
 
 negative_unary = { "-" ~ expression }
-logical_not_unary = { "~" ~ expression }
-bitwise_complement_unary = { "!" ~ expression }
+logical_not_unary = { "!" ~ expression }
+bitwise_complement_unary = { "~" ~ expression }
 
 
 

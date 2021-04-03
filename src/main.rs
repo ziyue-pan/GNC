@@ -71,7 +71,7 @@ mod tests {
         let mut code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
 
-        Command::new("sh").arg("-c").arg("llvm-dis basic.bc").output().expect("failed to execute process");
+        Command::new("sh").arg("-c").arg("llvm-dis test/basic/basic.bc").output().expect("failed to execute process");
     }
 
     #[test]
@@ -85,5 +85,7 @@ mod tests {
         let context = Context::create();
         let mut code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
+
+        Command::new("sh").arg("-c").arg("llvm-dis test/unary/unary.bc").output().expect("failed to execute process");
     }
 }
