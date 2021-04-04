@@ -115,16 +115,6 @@ impl<'ctx> CodeGen<'ctx> {
         match statement {
             GNCAST::ReturnStatement(ref ptr_to_expr) => {
                 self.builder.build_return(Some(&self.gen_expression(ptr_to_expr)));
-//                match **ptr_to_expr {
-//                    GNCAST::IntLiteral(ref int_literal) => {
-//                        let i32_literal = self.context.i32_type().const_int(*int_literal as u64, true);
-//                        self.builder.build_return(Some(&i32_literal));
-//                    }
-//                    GNCAST::UnaryExpression(ref unary_operation, ref expression) => {
-//                        self.builder.build_return(Some(&self.gen_expression(expression)));
-//                    }
-//                    _ => {}
-//                }
             }
             GNCAST::Declaration(ref data_type, ref identifier) => {
                 match data_type {
@@ -161,7 +151,6 @@ impl<'ctx> CodeGen<'ctx> {
                         return self.gen_expression(&*expr).const_neg();
                     }
                     UnaryOperator::LogicalNot => {
-//                        return self.gen_expression(&*expr).const_not();
                         let res = self.gen_expression(&*expr).const_int_compare(IntPredicate::EQ, self.context.i32_type().const_int(0 as u64, true)).const_cast(self.context.i32_type(), true).const_neg();
                         res.print_to_stderr();
                         return res;

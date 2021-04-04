@@ -16,5 +16,5 @@ not_unary:
 
 define i32 @complement_unary() {
 complement_unary:
-  ret i1 false
+  ret i32 0
 }
