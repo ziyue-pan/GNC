@@ -88,4 +88,19 @@ mod tests {
 
         Command::new("sh").arg("-c").arg("llvm-dis test/unary/unary.bc").output().expect("failed to execute process");
     }
+
+    #[test]
+    fn test_add_mul() {
+        let file_path = "./test/add_mul/add_mul.c";
+
+        let ast = parser::parse(file_path);
+
+        checker::check(&ast);
+
+        let context = Context::create();
+        let mut code_gen = CodeGen::new(&context, file_path);
+        code_gen.gen(&ast);
+
+        Command::new("sh").arg("-c").arg("llvm-dis test/add_mul/add_mul.bc").output().expect("failed to execute process");
+    }
 }
