@@ -7,6 +7,7 @@ dependencies = [
  "clap",
  "colored",
  "inkwell",
+ "lazy_static",
  "pest",
  "pest_derive",
 ]

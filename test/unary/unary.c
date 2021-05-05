@@ -1,12 +1,15 @@
 int neg_unary() {
     int a = -2;
-    return a;
+    return -a;
 }
 
 int not_unary() {
-    return ~2;
+    int a = 1;
+    return ~a;
 }
 
 int complement_unary() {
-    return !3;
+    int b = !0;
+    int a = !23;
+    return !b;
 }

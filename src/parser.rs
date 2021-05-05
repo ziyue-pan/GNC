@@ -3,6 +3,9 @@ use pest::iterators::{Pair, Pairs};
 use pest::error::Error;
 use std::fs::File;
 use std::io::Read;
+use pest::prec_climber::PrecClimber;
+use pest::prec_climber::Assoc;
+use pest::prec_climber::Operator;
 
 #[derive(Parser)]
 #[grammar = "./gnc.pest"]
@@ -30,11 +33,19 @@ pub enum UnaryOperator {
     BitwiseComplement,
 }
 
+pub enum BinaryOperator {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+}
+
 pub enum GNCAST {
     // Function AST: return type, name, parameter list and code block
     Function(GNCType, String, Vec<GNCParameter>, Vec<GNCAST>),
     ReturnStatement(Box<GNCAST>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
+    BinaryExpression(BinaryOperator, Box<GNCAST>, Box<GNCAST>),
     IntLiteral(i32),
     Identifier(String),
     Declaration(GNCType, String),
@@ -118,7 +129,7 @@ fn visit_function_parameter_list(pair: Pair<'_, Rule>, func_param_list: &mut Vec
 }
 
 fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
-    let mut data_type : GNCType = GNCType::Int;
+    let mut data_type: GNCType = GNCType::Int;
 
     for token in pair.into_inner() {
         match token.as_rule() {
@@ -127,13 +138,16 @@ fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
             Rule::declaration => {
                 visit_declaration(token, func_statements, data_type.clone())
             }
+//            Rule::assignment => {
+//                visit_assignment(token, func_statements)
+//            } // TODO Assignment Parse;
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
         }
     }
 }
 
 fn visit_declaration(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>, ty: GNCType) {
-    let mut variable_name : String = String::new();
+    let mut variable_name: String = String::new();
 
     for token in pair.into_inner() {
         match token.as_rule() {
@@ -147,7 +161,6 @@ fn visit_declaration(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>, ty
             _ => { panic!("[ERROR] unexpected token while parsing return statement"); }
         }
     }
-
 }
 
 fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
@@ -162,26 +175,59 @@ fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST
     }
 }
 
+lazy_static! {
+    static ref PREC_CLIMBER: PrecClimber<Rule> = {
+        PrecClimber::new(vec![
+            Operator::new(Rule::add, Assoc::Left) | Operator::new(Rule::subtract, Assoc::Left),
+            Operator::new(Rule::multiply, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left)
+        ])
+    };
+}
 
-fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
-    println!("expression parsed: {}", pair);
-    for token in pair.into_inner() {
-        println!("token parsed: {}", token);
-        match token.as_rule() {
-            Rule::unary_expression => {
-                return visit_unary(token);
-            }
-            Rule::int_literal => {
-                let int_literal = token.as_str().to_string().parse::<i32>().unwrap();
-                return GNCAST::IntLiteral(int_literal);
-            }
-            Rule::identifier => {
-                return GNCAST::Identifier(token.as_str().to_string());
-            }
-            _ => { panic!("[ERROR] unexpected token while parsing expressions {}", token); }
-        }
+fn visit_int_literal(pair: Pair<'_, Rule>) -> GNCAST {
+    println!("{}", pair);
+    let literal = pair.into_inner().next().unwrap();
+    println!("{}", literal);
+    match literal.as_rule() {
+        Rule::dec_literal => GNCAST::IntLiteral(literal.as_str().to_string().parse::<i32>().unwrap()),
+        _ => panic!("Unsupported int literal.")
     }
-    panic!("[ERROR] missing token while parsing expressions");
+}
+
+fn visit_expression(pairs: Pair<'_, Rule>) -> GNCAST {
+    println!("{}", pairs);
+    PREC_CLIMBER.climb(
+        pairs.into_inner(),
+        |pair: Pair<Rule>| match pair.as_rule() {
+            Rule::int_literal => visit_int_literal(pair),
+            Rule::identifier => GNCAST::Identifier(pair.as_str().to_string()),
+            Rule::expression => visit_expression(pair),
+            Rule::unary_expression => visit_unary(pair),
+            _ => {
+                println!("{}", pair);
+                unreachable!()
+            },
+        },
+        |lhs: GNCAST, op: Pair<Rule>, rhs: GNCAST| match op.as_rule() {
+            Rule::add => GNCAST::BinaryExpression(BinaryOperator::Add, Box::new(lhs), Box::new(rhs)),
+            Rule::subtract => GNCAST::BinaryExpression(BinaryOperator::Subtract, Box::new(lhs), Box::new(rhs)),
+            Rule::multiply => GNCAST::BinaryExpression(BinaryOperator::Multiply, Box::new(lhs), Box::new(rhs)),
+            Rule::divide => GNCAST::BinaryExpression(BinaryOperator::Divide, Box::new(lhs), Box::new(rhs)),
+            _ => {
+                unreachable!()
+            },
+        },
+    )
+}
+
+fn visit_term(pair: Pair<'_, Rule>) -> GNCAST {
+    match pair.as_rule() {
+        Rule::int_literal => visit_int_literal(pair),
+        Rule::identifier => GNCAST::Identifier(pair.as_str().to_string()),
+        Rule::unary_expression => visit_unary(pair),
+        Rule::expression => visit_expression(pair),
+        _ => unreachable!()
+    }
 }
 
 fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
@@ -189,24 +235,19 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
     for token in pair.into_inner() {
         match token.as_rule() {
             Rule::negative_unary => {
-                let expression = visit_expression(token.into_inner().next().unwrap());
-                return GNCAST::UnaryExpression(UnaryOperator::UnaryMinus, Box::new(expression))
+                let expression = visit_term(token.into_inner().next().unwrap());
+                return GNCAST::UnaryExpression(UnaryOperator::UnaryMinus, Box::new(expression));
             }
             Rule::logical_not_unary => {
-                let expression = visit_expression(token.into_inner().next().unwrap());
-                return GNCAST::UnaryExpression(UnaryOperator::LogicalNot, Box::new(expression))
+                let expression = visit_term(token.into_inner().next().unwrap());
+                return GNCAST::UnaryExpression(UnaryOperator::LogicalNot, Box::new(expression));
             }
             Rule::bitwise_complement_unary => {
-                let expression = visit_expression(token.into_inner().next().unwrap());
-                return GNCAST::UnaryExpression(UnaryOperator::BitwiseComplement, Box::new(expression))
+                let expression = visit_term(token.into_inner().next().unwrap());
+                return GNCAST::UnaryExpression(UnaryOperator::BitwiseComplement, Box::new(expression));
             }
             _ => { panic!("[ERROR] unexpected token while parsing expressions {}", token); }
         }
     }
     panic!("[ERROR] missing unary while parsing expressions");
 }
-
-
-
-
-

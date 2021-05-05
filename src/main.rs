@@ -4,6 +4,9 @@ extern crate pest;
 extern crate pest_derive;
 extern crate inkwell;
 extern crate colored;
+#[macro_use(lazy_static)]
+extern crate lazy_static;
+
 
 use clap::{App, Arg};
 use std::path::Path;

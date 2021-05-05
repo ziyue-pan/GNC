@@ -2,7 +2,7 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
-use parser::{GNCAST, GNCType, UnaryOperator};
+use parser::{GNCAST, GNCType, UnaryOperator, BinaryOperator};
 use inkwell::types::FunctionType;
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
 use inkwell::IntPredicate;
@@ -114,6 +114,7 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_statement(&mut self, statement: &GNCAST) {
         match statement {
             GNCAST::ReturnStatement(ref ptr_to_expr) => {
+                print_ast(ptr_to_expr, 0);
                 self.builder.build_return(Some(&self.gen_expression(ptr_to_expr)));
             }
             GNCAST::Declaration(ref data_type, ref identifier) => {
@@ -129,6 +130,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             GNCAST::Assignment(ref identifier, ref ptr_to_expr) => {
+                print_ast(ptr_to_expr, 0);
                 self.builder.build_store(self.get_point_value(identifier), self.gen_expression(&*ptr_to_expr));
             }
             _ => {
@@ -140,27 +142,47 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_expression(&self, expression: &GNCAST) -> IntValue {
         match expression {
             GNCAST::Identifier(ref identifier) => {
+                println!("building identifier");
                 return self.builder.build_load(self.get_point_value(identifier), "load_val").into_int_value();
             }
             GNCAST::IntLiteral(ref int_literal) => {
                 return self.context.i32_type().const_int(*int_literal as u64, true);
             }
             GNCAST::UnaryExpression(ref op, ref expr) => {
+                println!("begin to build unary");
                 match op {
                     UnaryOperator::UnaryMinus => {
-                        return self.gen_expression(&*expr).const_neg();
+                        return self.builder.build_int_neg(self.gen_expression(&*expr), "building neg");
                     }
                     UnaryOperator::LogicalNot => {
-                        let res = self.gen_expression(&*expr).const_int_compare(IntPredicate::EQ, self.context.i32_type().const_int(0 as u64, true)).const_cast(self.context.i32_type(), true).const_neg();
-                        res.print_to_stderr();
+//                        let res = self.gen_expression(&*expr).const_int_compare(IntPredicate::EQ, self.context.i32_type().const_int(0 as u64, true)).const_cast(self.context.i32_type(), true).const_neg();
+                        let res = self.builder.build_int_compare(
+                                IntPredicate::EQ,
+                                self.context.i32_type().const_int(0 as u64, true),
+                                self.gen_expression(&*expr), "build logical not");
+
+                        let res = self.builder.build_int_cast(res, self.context.i32_type(), "logical not casting");
+                        let res = self.builder.build_int_sub(self.context.i32_type().const_int(0 as u64, true), res, "logical not");
+//                        res.print_to_stderr();
                         return res;
                     }
                     UnaryOperator::BitwiseComplement => {
-                        return self.gen_expression(&*expr).const_not();
+                        let res = self.builder.build_not(self.gen_expression(&*expr), "build not");
+                        return res;
                     }
                     _ => {
                         panic!("Invalid Expression Type");
                     }
+                }
+            }
+            GNCAST::BinaryExpression(ref op, ref lhs, ref rhs) => {
+                let lhs_v = self.gen_expression(lhs);
+                let rhs_v = self.gen_expression(rhs);
+                match op {
+                    BinaryOperator::Add => self.builder.build_int_add(lhs_v, rhs_v, "i32 add"),
+                    BinaryOperator::Subtract => self.builder.build_int_sub(lhs_v, rhs_v, "i32 sub"),
+                    BinaryOperator::Multiply => self.builder.build_int_mul(lhs_v, rhs_v, "i32 mul"),
+                    BinaryOperator::Divide => self.builder.build_int_signed_div(lhs_v, rhs_v, "i32 signed div"),
                 }
             }
             _ => {panic!("Invalid Expression Type")}
@@ -168,3 +190,38 @@ impl<'ctx> CodeGen<'ctx> {
     }
 }
 
+fn print_ast(tree: &GNCAST, indent: usize) {
+    match tree {
+        GNCAST::Function(ref ty, ref name, ref parm, ref vec) => {
+            println!("function {}", name);
+            for node in vec {
+                print_ast(node, indent + 1);
+            }
+        }
+        GNCAST::ReturnStatement(ref statements) => {
+            println!("{}Returning", "    ".repeat(indent));
+            print_ast(statements, indent + 1);
+        }
+        GNCAST::UnaryExpression(ref op, ref ast) => {
+            println!("{}unary expr:", "    ".repeat(indent));
+            print_ast(ast, indent + 1);
+        }
+        GNCAST::BinaryExpression(ref op, ref lhs, ref rhs) => {
+            println!("{}binary expr:", "    ".repeat(indent));
+            print_ast(lhs, indent+1);
+            println!("{} bin_op", "    ".repeat(indent+1));
+            print_ast(rhs, indent+1);
+        }
+        GNCAST::IntLiteral(ref val) => {
+            println!("{}{}", "    ".repeat(indent), val);
+        }
+        GNCAST::Identifier((ref id)) => println!("{}{}", "    ".repeat(indent), id),
+        GNCAST::Declaration(ref ty, ref id) => {
+            println!("{}declaration: {}",  "    ".repeat(indent), id);
+        }
+        GNCAST::Assignment(ref id, ref ast) => {
+            println!("{}assignment", "    ".repeat(indent));
+            print_ast(ast, indent+1);
+        }
+    }
+}

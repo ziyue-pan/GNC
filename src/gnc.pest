@@ -28,25 +28,21 @@ identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 // 类型
 data_type = { "int" }
 
-
-
-
 // 函数参数表
 function_parameter_list = {
     "(" ~ (none_function_parameter) ~ ")"
 }
 
-// function_parameter_list = {
-//     open_brace
-//         ~ (none_function_parameter | function_parameter ~ (comma ~ function_parameter)* )
-//     ~ close_brace
-// }
-
 none_function_parameter = { WHITESPACE | "" }
 
 statement = {
     return_statement ~ ";" |
-    data_type ~ ( declaration ~  ",")*  ~ declaration ~ ";"
+    data_type ~ ( declaration ~  ",")*  ~ declaration ~ ";" |
+    assignment ~ ";"
+}
+
+assignment = {
+	identifier ~ "=" ~ expression ~ ( "," ~ identifier ~ "=" ~ expression )*
 }
 
 declaration = {
@@ -55,26 +51,25 @@ declaration = {
 
 return_statement = { "return" ~ expression }
 
-// 表达式
-expression = {
-    unary_expression |
-    identifier |
-    int_literal
-}
+bin_op = _{ add | subtract | multiply | divide | power }
+    add      = { "+" }
+    subtract = { "-" }
+    multiply = { "*" }
+    divide   = { "/" }
+    power    = { "^" }
 
-// 一元操作运算符
+expression = { term ~ (bin_op ~ term)* }
+term = _{ int_literal | identifier | "(" ~ expression ~ ")" | unary_expression }
+
 unary_expression = {
     negative_unary |
     logical_not_unary |
     bitwise_complement_unary
 }
 
-negative_unary = { "-" ~ expression }
-logical_not_unary = { "!" ~ expression }
-bitwise_complement_unary = { "~" ~ expression }
-
-
-
+negative_unary = { "-" ~ term }
+logical_not_unary = { "!" ~ term }
+bitwise_complement_unary = { "~" ~ term }
 
 // 字面量
 int_literal = { dec_literal | hex_literal | oct_literal }
