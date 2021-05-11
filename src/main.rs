@@ -63,6 +63,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_all() {
+        let file_path = "./test/all/all.c";
+
+        let ast = parser::parse(file_path);
+
+        checker::check(&ast);
+
+        let context = Context::create();
+        let mut code_gen = CodeGen::new(&context, file_path);
+        code_gen.gen(&ast);
+
+        Command::new("sh").arg("-c").arg("llvm-dis test/basic/basic.bc").output().expect("failed to execute process");
+    }
+
+    #[test]
     fn test_basic() {
         let file_path = "./test/basic/basic.c";
 

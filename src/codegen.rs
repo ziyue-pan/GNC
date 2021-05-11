@@ -17,18 +17,19 @@ pub struct CodeGen<'ctx> {
     context: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
-    addr_map_stack: Vec<HashMap<String, PointerValue<'ctx>>>
+    addr_map_stack: Vec<HashMap<String, PointerValue<'ctx>>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
-
     pub fn new(context: &'ctx Context, source_path: &'ctx str) -> CodeGen<'ctx> {
         let module_name = Path::new(source_path).file_stem().unwrap().to_str().unwrap().to_string();
         let module = context.create_module(module_name.as_str());
         let builder = context.create_builder();
+
+        // set variable scope
         let mut addr_map_stack = Vec::new();
         let mut global_map: HashMap<String, PointerValue> = HashMap::new();
-        addr_map_stack.push(global_map);
+        addr_map_stack.push(global_map); // push global variable hashmap
 
         CodeGen {
             source_path,
@@ -44,20 +45,26 @@ impl<'ctx> CodeGen<'ctx> {
         for node in ast {
             match node {
                 GNCAST::Function(ref func_type,
-                                   ref func_name,
-                                   ref func_param,
-                                   ref func_body) => {
+                                 ref func_name,
+                                 ref func_param,
+                                 ref func_body) => {
+
+                    // TODO add function parameter
+                    // function parameter should be added in this llvm_func_type
                     let llvm_func_type = match func_type {
                         GNCType::Int => { self.context.i32_type().fn_type(&[], false) }
                         _ => { self.context.i32_type().fn_type(&[], false) }
                     };
+
+                    // push local map
                     let local_map: HashMap<String, PointerValue> = HashMap::new();
                     self.addr_map_stack.push(local_map);
                     let func = self.module.add_function(func_name.as_str(), llvm_func_type, None);
                     let func_block = self.context.append_basic_block(func, func_name);
                     self.builder.position_at_end(func_block);
 
-                    for statement in func_body {
+                    // generate IR for statements inside the function body
+                    for statement in func_body.into() {
                         self.gen_statement(statement);
                     }
                     self.addr_map_stack.pop();
@@ -67,10 +74,12 @@ impl<'ctx> CodeGen<'ctx> {
             }
         }
 
+        // set llvm bitcode path
         let mut llvm_bitcode_path = PathBuf::from(self.source_path);
         llvm_bitcode_path.set_extension("bc");
         self.module.write_bitcode_to_path(llvm_bitcode_path.as_path());
 
+        // set llvm target
         Target::initialize_native(&InitializationConfig::default()).expect("Failed to initialize native target");
 
         let triple = TargetMachine::get_default_triple();
@@ -89,6 +98,7 @@ impl<'ctx> CodeGen<'ctx> {
             )
             .unwrap();
 
+        // write assembly code
         let mut target_assembly_path = PathBuf::from(self.source_path);
         target_assembly_path.set_extension("asm");
         machine.write_to_file(&self.module, FileType::Assembly, target_assembly_path.as_ref()).unwrap();
@@ -97,7 +107,7 @@ impl<'ctx> CodeGen<'ctx> {
     fn get_point_value(&self, identifier: &String) -> PointerValue {
         for map in self.addr_map_stack.iter().rev() {
             match map.get(identifier) {
-                Some(addr) => {return *addr}
+                Some(addr) => { return *addr; }
                 _ => {}
             }
         }
@@ -107,7 +117,7 @@ impl<'ctx> CodeGen<'ctx> {
     fn save_ptr_val(&mut self, identifier: &String, ptr_val: PointerValue<'ctx>) {
         match self.addr_map_stack.last_mut() {
             Some(mut map) => { map.insert(identifier.to_string(), ptr_val); }
-            _ => {panic!(identifier.to_string() + " not found. Addr HashMap Stack overflow"); }
+            _ => { panic!(identifier.to_string() + " not found. Addr HashMap Stack overflow"); }
         }
     }
 
@@ -157,9 +167,9 @@ impl<'ctx> CodeGen<'ctx> {
                     UnaryOperator::LogicalNot => {
 //                        let res = self.gen_expression(&*expr).const_int_compare(IntPredicate::EQ, self.context.i32_type().const_int(0 as u64, true)).const_cast(self.context.i32_type(), true).const_neg();
                         let res = self.builder.build_int_compare(
-                                IntPredicate::EQ,
-                                self.context.i32_type().const_int(0 as u64, true),
-                                self.gen_expression(&*expr), "build logical not");
+                            IntPredicate::EQ,
+                            self.context.i32_type().const_int(0 as u64, true),
+                            self.gen_expression(&*expr), "build logical not");
 
                         let res = self.builder.build_int_cast(res, self.context.i32_type(), "logical not casting");
                         let res = self.builder.build_int_sub(self.context.i32_type().const_int(0 as u64, true), res, "logical not");
@@ -183,9 +193,10 @@ impl<'ctx> CodeGen<'ctx> {
                     BinaryOperator::Subtract => self.builder.build_int_sub(lhs_v, rhs_v, "i32 sub"),
                     BinaryOperator::Multiply => self.builder.build_int_mul(lhs_v, rhs_v, "i32 mul"),
                     BinaryOperator::Divide => self.builder.build_int_signed_div(lhs_v, rhs_v, "i32 signed div"),
+                    _ => {}
                 }
             }
-            _ => {panic!("Invalid Expression Type")}
+            _ => { panic!("Invalid Expression Type") }
         }
     }
 }
@@ -208,20 +219,21 @@ fn print_ast(tree: &GNCAST, indent: usize) {
         }
         GNCAST::BinaryExpression(ref op, ref lhs, ref rhs) => {
             println!("{}binary expr:", "    ".repeat(indent));
-            print_ast(lhs, indent+1);
-            println!("{} bin_op", "    ".repeat(indent+1));
-            print_ast(rhs, indent+1);
+            print_ast(lhs, indent + 1);
+            println!("{} bin_op", "    ".repeat(indent + 1));
+            print_ast(rhs, indent + 1);
         }
         GNCAST::IntLiteral(ref val) => {
             println!("{}{}", "    ".repeat(indent), val);
         }
         GNCAST::Identifier((ref id)) => println!("{}{}", "    ".repeat(indent), id),
         GNCAST::Declaration(ref ty, ref id) => {
-            println!("{}declaration: {}",  "    ".repeat(indent), id);
+            println!("{}declaration: {}", "    ".repeat(indent), id);
         }
         GNCAST::Assignment(ref id, ref ast) => {
             println!("{}assignment", "    ".repeat(indent));
-            print_ast(ast, indent+1);
+            print_ast(ast, indent + 1);
         }
+        _ => {}
     }
 }

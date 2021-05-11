@@ -1,5 +1,7 @@
 # GNC 
 
+[![Build Status](https://github.com/PAN-Ziyue/GNC/workflows/build/badge.svg?event=push)](https://github.com/PAN-Ziyue/GNC/actions?workflow=build)
+
 **GNC** is **N**ot **C**. It is intended for a better and more effective c language.
 
 ## Grammar Features
@@ -8,9 +10,8 @@
 - [x] declare local int variable
 - [x] unary operation  
 - [x] binary operation
-- [ ] trinary operation
-- [ ] conditional statement
-- [ ] loop statement
+- [x] conditional statement
+- [x] loop statement
 - [ ] scope 
 - [ ] function
 - [ ] global variable
@@ -27,10 +28,11 @@
 ## Development
 
 - [ ] unit test for a single grammar feature
-- [ ] intergrated test for combinations of grammar features
+- [ ] integrated test for combinations of grammar features
 - [ ] functional test for small programs
 
 
 ## Reference
 
-* [toy-c compiler implemented by rust and llvm](https://github.com/maekawatoshiki/rucc)
+- [toy-c compiler implemented by rust and llvm](https://github.com/maekawatoshiki/rucc)
+- [C PEG grammar script](https://github.com/pointlander/peg/blob/master/grammars/c/c.peg)
