@@ -6,9 +6,9 @@ use std::io::Read;
 use pest::prec_climber::PrecClimber;
 use pest::prec_climber::Assoc;
 use pest::prec_climber::Operator;
-use parser::BinaryOperator::LogicalOr;
+use parser::BinaryOperator::{LogicalOr, LogicalAnd};
 use parser::UnaryOperator::UnaryMinus;
-use parser::GNCAST::{UnaryExpression, BinaryExpression};
+use parser::GNCAST::{UnaryExpression, BinaryExpression, Assignment};
 use parser::AssignOperation::Simple;
 
 #[derive(Parser)]
@@ -44,7 +44,16 @@ pub enum BinaryOperator {
     Add,
     Subtract,
     Multiply,
+    Modulus,
     Divide,
+    Equal,
+    ShiftRight,
+    ShiftLeft,
+    LessThan,
+    GreaterThan,
+    LessEqual,
+    GreaterEqual,
+    NotEqual,
     BitwiseAnd,
     ExclusiveOr,
     InclusiveOr,
@@ -58,10 +67,10 @@ pub enum AssignOperation {
     Subtraction,
     Multiplication,
     Division,
-    Modulo,
+    Modulus,
     BitwiseAnd,
-    BitwiseOr,
-    BitwiseXor,
+    InclusiveOr,
+    ExclusiveOr,
     ShiftLeft,
     ShiftRight,
 }
@@ -188,6 +197,21 @@ fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
             Rule::expression => {
                 visit_expression(token);
             }
+            Rule::if_statement => {
+                // TODO
+            }
+            Rule::while_statement => {
+                // TODO
+            }
+            Rule::do_while_statement => {
+                // TODO
+            }
+            Rule::do_while_statement => {
+                // TODO
+            }
+            Rule::for_statement => {
+                // TODO
+            }
             Rule::return_statement => { visit_return_statement(token, func_statements); }
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
         }
@@ -252,8 +276,6 @@ fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST
 //      expressions
 //<<<<<<<<<<<<<<<<<<<<<<<<<<
 fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
-    println!("{}", pair);
-
     return if pair.as_rule() == Rule::assignment_expression {
         visit_assignment(pair)
     } else if pair.as_rule() == Rule::unary_expression {
@@ -267,7 +289,6 @@ fn visit_assignment(pair: Pair<'_, Rule>) -> GNCAST {
     let mut lhs: String = String::new();
     let mut assign_op = AssignOperation::Simple;
 
-
     for token in pair.into_inner() {
         if token.as_rule() == Rule::identifier {
             lhs = token.as_str().to_string();
@@ -276,8 +297,18 @@ fn visit_assignment(pair: Pair<'_, Rule>) -> GNCAST {
             let assign = GNCAST::Assignment(assign_op, lhs, Box::new(rhs));
             return assign;
         } else {
-            assign_op = match token.as_str() {
-                "=" => AssignOperation::Simple,
+            assign_op = match token.as_rule() {
+                Rule::assign_simple => AssignOperation::Simple,
+                Rule::assign_div => AssignOperation::Division,
+                Rule::assign_mul => AssignOperation::Multiplication,
+                Rule::assign_mod => AssignOperation::Modulus,
+                Rule::assign_add => AssignOperation::Addition,
+                Rule::assign_sub => AssignOperation::Subtraction,
+                Rule::assign_shift_left => AssignOperation::ShiftLeft,
+                Rule::assign_shift_right => AssignOperation::ShiftRight,
+                Rule::assign_bitwise_and => AssignOperation::BitwiseAnd,
+                Rule::assign_exclusive_or => AssignOperation::ExclusiveOr,
+                Rule::assign_inclusive_or => AssignOperation::InclusiveOr,
                 _ => { panic!(); }
             }
         }
@@ -287,13 +318,31 @@ fn visit_assignment(pair: Pair<'_, Rule>) -> GNCAST {
 
 fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
     let mut pairs = pair.into_inner();
+
     let mut lhs = visit_expression(pairs.next().unwrap());
     let mut expr = pairs.next(); // now is the symbol
 
     while expr.is_some() {
-        let op = match expr.unwrap().as_str() {
-            "||" => LogicalOr,
-            _ => { panic!() }
+        let op = match expr.unwrap().as_rule() {
+            Rule::op_add => BinaryOperator::Add,
+            Rule::op_sub => BinaryOperator::Subtract,
+            Rule::op_mul => BinaryOperator::Multiply,
+            Rule::op_div => BinaryOperator::Divide,
+            Rule::op_mod => BinaryOperator::Modulus,
+            Rule::op_shift_right => BinaryOperator::ShiftRight,
+            Rule::op_shift_left => BinaryOperator::ShiftLeft,
+            Rule::op_gt => BinaryOperator::GreaterThan,
+            Rule::op_lt => BinaryOperator::LessThan,
+            Rule::op_ge => BinaryOperator::GreaterEqual,
+            Rule::op_le => BinaryOperator::LessEqual,
+            Rule::op_ne => BinaryOperator::NotEqual,
+            Rule::op_eq => BinaryOperator::Equal,
+            Rule::op_bitwise_and => BinaryOperator::BitwiseAnd,
+            Rule::op_exclusive_or => BinaryOperator::ExclusiveOr,
+            Rule::op_inclusive_or => BinaryOperator::InclusiveOr,
+            Rule::op_logical_and => BinaryOperator::LogicalAnd,
+            Rule::op_logical_or => BinaryOperator::LogicalOr,
+            _ => { panic!(); }
         };
         expr = pairs.next();
         let rhs = visit_expression(expr.unwrap());
@@ -322,10 +371,10 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
             GNCAST::Identifier(expr.as_str().to_string())
         } else {
             GNCAST::UnaryExpression(
-                match expr.as_str() {
-                    "-" => UnaryOperator::UnaryMinus,
-                    "!" => UnaryOperator::LogicalNot,
-                    "*" => UnaryOperator::BitwiseComplement,
+                match expr.as_rule() {
+                    Rule::op_arithmetic_not => UnaryOperator::UnaryMinus,
+                    Rule::op_logical_not => UnaryOperator::LogicalNot,
+                    Rule::op_bitwise_not => UnaryOperator::BitwiseComplement,
                     _ => { panic!() }
                 },
                 Box::new(visit_expression(expr)),
@@ -349,57 +398,9 @@ fn visit_data_type(pair: Pair<'_, Rule>) -> GNCType {
 
 
 fn visit_int_literal(pair: Pair<'_, Rule>) -> GNCAST {
-    println!("{}", pair);
     let literal = pair.into_inner().next().unwrap();
-    println!("{}", literal);
     match literal.as_rule() {
         Rule::dec_literal => GNCAST::IntLiteral(literal.as_str().to_string().parse::<i32>().unwrap()),
         _ => panic!("Unsupported int literal.")
     }
 }
-
-
-// lazy_static! {
-//     static ref PREC_CLIMBER: PrecClimber<Rule> = {
-//         PrecClimber::new(vec![
-//             Operator::new(Rule::add, Assoc::Left) | Operator::new(Rule::subtract, Assoc::Left),
-//             Operator::new(Rule::multiply, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left)
-//         ])
-//     };
-// }
-//
-
-//
-
-//
-// fn visit_term(pair: Pair<'_, Rule>) -> GNCAST {
-//     match pair.as_rule() {
-//         Rule::int_literal => visit_int_literal(pair),
-//         Rule::identifier => GNCAST::Identifier(pair.as_str().to_string()),
-//         Rule::unary_expression => visit_unary(pair),
-//         Rule::expression => visit_expression(pair),
-//         _ => unreachable!()
-//     }
-// }
-//
-// fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
-//     println!("unary parsed: {}", pair);
-//     for token in pair.into_inner() {
-//         match token.as_rule() {
-//             Rule::negative_unary => {
-//                 let expression = visit_term(token.into_inner().next().unwrap());
-//                 return GNCAST::UnaryExpression(UnaryOperator::UnaryMinus, Box::new(expression));
-//             }
-//             Rule::logical_not_unary => {
-//                 let expression = visit_term(token.into_inner().next().unwrap());
-//                 return GNCAST::UnaryExpression(UnaryOperator::LogicalNot, Box::new(expression));
-//             }
-//             Rule::bitwise_complement_unary => {
-//                 let expression = visit_term(token.into_inner().next().unwrap());
-//                 return GNCAST::UnaryExpression(UnaryOperator::BitwiseComplement, Box::new(expression));
-//             }
-//             _ => { panic!("[ERROR] unexpected token while parsing expressions {}", token); }
-//         }
-//     }
-//     panic!("[ERROR] missing unary while parsing expressions");
-// }

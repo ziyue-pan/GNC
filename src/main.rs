@@ -108,8 +108,8 @@ mod tests {
     }
 
     #[test]
-    fn test_add_mul() {
-        let file_path = "./test/add_mul/add_mul.c";
+    fn test_binary() {
+        let file_path = "./test/binary/binary.c";
 
         let ast = parser::parse(file_path);
 
@@ -119,6 +119,6 @@ mod tests {
         let mut code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
 
-        Command::new("sh").arg("-c").arg("llvm-dis test/add_mul/add_mul.bc").output().expect("failed to execute process");
+        Command::new("sh").arg("-c").arg("llvm-dis test/binary/binary.bc").output().expect("failed to execute process");
     }
 }

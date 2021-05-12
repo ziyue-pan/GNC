@@ -67,30 +67,75 @@ unary_expression = {
     "(" ~ expression ~ ")" |
     int_literal |
     identifier |
-    "-" ~ unary_expression |
-    "!" ~ unary_expression |
-    "~" ~ unary_expression
+    op_arithmetic_not ~ unary_expression |
+    op_logical_not ~ unary_expression |
+    op_bitwise_not ~ unary_expression
 }
-multiplicative_expression = { unary_expression ~ (("*" | "/") ~ unary_expression)* }
-additive_expression = { multiplicative_expression ~ (("+" | "-") ~ multiplicative_expression)* }
-shift_expression = { additive_expression ~ (("<<" | ">>") ~ additive_expression)* }
-comparison_expression = { shift_expression ~ (("<=" | ">=" | "<" | ">") ~ shift_expression)* }
-equality_expression = { comparison_expression ~ (("==" | "!=") ~ comparison_expression)* }
-bitwise_and_expression = { equality_expression ~ ("&" ~ equality_expression )* }
-exclusive_or_expression = { bitwise_and_expression ~ ("^" ~ bitwise_and_expression)* }
-inclusive_or_expression = { exclusive_or_expression ~ ("|" ~ exclusive_or_expression)* }
-logical_and_expression = { inclusive_or_expression ~ ("&&" ~ inclusive_or_expression)* }
-logical_or_expression = { logical_and_expression ~ ("||" ~ logical_and_expression)* }
+multiplicative_expression = { unary_expression ~ ((op_mul | op_div | op_add) ~ unary_expression)* }
+additive_expression = { multiplicative_expression ~ ((op_add | op_sub) ~ multiplicative_expression)* }
+shift_expression = { additive_expression ~ ((op_shift_right | op_shift_left) ~ additive_expression)* }
+comparison_expression = { shift_expression ~ ((op_ge | op_le | op_gt | op_lt)  ~ shift_expression)* }
+equality_expression = { comparison_expression ~ ((op_ne | op_eq) ~ comparison_expression)* }
+bitwise_and_expression = { equality_expression ~ (op_bitwise_and ~ equality_expression )* }
+exclusive_or_expression = { bitwise_and_expression ~ (op_exclusive_or ~ bitwise_and_expression)* }
+inclusive_or_expression = { exclusive_or_expression ~ (op_inclusive_or ~ exclusive_or_expression)* }
+logical_and_expression = { inclusive_or_expression ~ (op_logical_and ~ inclusive_or_expression)* }
+logical_or_expression = { logical_and_expression ~ (op_logical_or ~ logical_and_expression)* }
 
-assignment_expression = { identifier
-    ~ ("=" | "/=" | "*=" | "%=" | "+=" | "-=" | "<<=" | ">>=" | "&=" | "^=" | "|=" )
-    ~ expression
+assignment_expression = { identifier ~ (assign_simple | assign_div | assign_mul | assign_mod |
+    assign_add | assign_sub | assign_shift_left | assign_shift_right | assign_bitwise_and |
+    assign_exclusive_or | assign_inclusive_or) ~ expression
 }
 
 
 //>>>>>>>>>>>>>>>
 //   TOKENS
 //<<<<<<<<<<<<<<<
+
+// All these rules with a single symbol is needed and cannot be deleted
+// Pest will strip all the internal strings and iteration will not include
+// all strings.
+
+// unary_operation
+op_arithmetic_not = { "-" }
+op_logical_not = { "!" }
+op_bitwise_not = { "~" }
+
+// binary operation
+op_add = { "+" }
+op_sub = { "-" }
+op_mul = { "*" }
+op_div = { "/" }
+op_mod = { "%" }
+op_shift_left = { "<<" }
+op_shift_right = { ">>" }
+op_ge = { ">=" }
+op_le = { "<=" }
+op_lt = { "<" }
+op_gt = { ">" }
+op_eq = { "==" }
+op_ne = { "!=" }
+op_bitwise_and = { "&" }
+op_exclusive_or = { "^" }
+op_inclusive_or = { "|" }
+op_logical_and = { "&&" }
+op_logical_or = { "||" }
+
+
+
+assign_simple = { "=" }
+assign_div = { "/=" }
+assign_mul = { "*=" }
+assign_mod = { "%=" }
+assign_add = { "+=" }
+assign_sub = { "-=" }
+assign_shift_left = { "<<=" }
+assign_shift_right = { ">>=" }
+assign_bitwise_and = { "&=" }
+assign_exclusive_or = { "^=" }
+assign_inclusive_or = { "|=" }
+
+
 
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
