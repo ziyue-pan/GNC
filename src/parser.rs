@@ -9,6 +9,7 @@ use pest::prec_climber::Operator;
 use parser::BinaryOperator::LogicalOr;
 use parser::UnaryOperator::UnaryMinus;
 use parser::GNCAST::{UnaryExpression, BinaryExpression};
+use parser::AssignOperation::Simple;
 
 #[derive(Parser)]
 #[grammar = "./gnc.pest"]
@@ -51,6 +52,20 @@ pub enum BinaryOperator {
     LogicalOr,
 }
 
+pub enum AssignOperation {
+    Simple,
+    Addition,
+    Subtraction,
+    Multiplication,
+    Division,
+    Modulo,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    ShiftLeft,
+    ShiftRight,
+}
+
 pub enum GNCAST {
     // Function AST: return type, name, parameter list and code block
     Function(GNCType, String, Vec<GNCParameter>, Vec<GNCAST>),
@@ -61,7 +76,7 @@ pub enum GNCAST {
     IntLiteral(i32),
     Identifier(String),
     Declaration(GNCType, String),
-    Assignment(String, Box<GNCAST>),
+    Assignment(AssignOperation, String, Box<GNCAST>),
 }
 
 // implement method for GNCAST
@@ -170,8 +185,8 @@ fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
             Rule::declaration_statement => {
                 visit_declaration_statement(token, func_statements);
             }
-            Rule::assignment_statement => {
-                visit_assignment_statement(token, func_statements);
+            Rule::expression => {
+                visit_expression(token);
             }
             Rule::return_statement => { visit_return_statement(token, func_statements); }
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
@@ -206,7 +221,9 @@ fn visit_declaration_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<G
                             func_statements.push(GNCAST::Declaration(data_type, variable_name.clone()))
                         }
                         Rule::expression => {
-                            func_statements.push(GNCAST::Assignment(variable_name.clone(), Box::new(visit_expression(inner_token))));
+                            func_statements.push(GNCAST::Assignment(AssignOperation::Simple,
+                                                                    variable_name.clone(),
+                                                                    Box::new(visit_expression(inner_token))));
                         }
                         _ => { panic!() }
                     }
@@ -217,9 +234,6 @@ fn visit_declaration_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<G
     }
 }
 
-fn visit_assignment_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
-
-}
 
 fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
     for token in pair.into_inner() {
@@ -240,10 +254,38 @@ fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST
 fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
     println!("{}", pair);
 
-    if pair.as_rule() == Rule::unary_expression {
-        return visit_unary(pair);
-    }
+    return if pair.as_rule() == Rule::assignment_expression {
+        visit_assignment(pair)
+    } else if pair.as_rule() == Rule::unary_expression {
+        visit_unary(pair)
+    } else {
+        visit_binary(pair)
+    };
+}
 
+fn visit_assignment(pair: Pair<'_, Rule>) -> GNCAST {
+    let mut lhs: String = String::new();
+    let mut assign_op = AssignOperation::Simple;
+
+
+    for token in pair.into_inner() {
+        if token.as_rule() == Rule::identifier {
+            lhs = token.as_str().to_string();
+        } else if token.as_rule() == Rule::expression {
+            let rhs = visit_expression(token);
+            let assign = GNCAST::Assignment(assign_op, lhs, Box::new(rhs));
+            return assign;
+        } else {
+            assign_op = match token.as_str() {
+                "=" => AssignOperation::Simple,
+                _ => { panic!(); }
+            }
+        }
+    }
+    panic!();
+}
+
+fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
     let mut pairs = pair.into_inner();
     let mut lhs = visit_expression(pairs.next().unwrap());
     let mut expr = pairs.next(); // now is the symbol
@@ -264,6 +306,7 @@ fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
     }
     return lhs;
 }
+
 
 fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
     let mut pairs = pair.into_inner();

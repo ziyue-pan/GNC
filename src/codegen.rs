@@ -146,7 +146,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
             }
-            GNCAST::Assignment(ref identifier, ref ptr_to_expr) => {
+            GNCAST::Assignment(ref op, ref identifier, ref ptr_to_expr) => {
                 print_ast(ptr_to_expr, 0);
                 self.builder.build_store(self.get_point_value(identifier), self.gen_expression(&*ptr_to_expr));
             }
@@ -233,7 +233,7 @@ fn print_ast(tree: &GNCAST, indent: usize) {
         GNCAST::Declaration(ref ty, ref id) => {
             println!("{}declaration: {}", "    ".repeat(indent), id);
         }
-        GNCAST::Assignment(ref id, ref ast) => {
+        GNCAST::Assignment(ref op, ref id, ref ast) => {
             println!("{}assignment", "    ".repeat(indent));
             print_ast(ast, indent + 1);
         }
