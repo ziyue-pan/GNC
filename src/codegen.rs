@@ -9,8 +9,13 @@ use inkwell::IntPredicate;
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
 use inkwell::values::{PointerValue, IntValue, InstructionOpcode};
+use inkwell::basic_block::BasicBlock;
 
+
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+//      Global Context
 // define global context for LLVM code generator
+//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 pub struct CodeGen<'ctx> {
     source_path: &'ctx str,
     module_name: String,
@@ -21,6 +26,7 @@ pub struct CodeGen<'ctx> {
 }
 
 impl<'ctx> CodeGen<'ctx> {
+    // new LLVM context
     pub fn new(context: &'ctx Context, source_path: &'ctx str) -> CodeGen<'ctx> {
         let module_name = Path::new(source_path).file_stem().unwrap().to_str().unwrap().to_string();
         let module = context.create_module(module_name.as_str());
@@ -31,7 +37,7 @@ impl<'ctx> CodeGen<'ctx> {
         let mut global_map: HashMap<String, PointerValue> = HashMap::new();
         addr_map_stack.push(global_map); // push global variable hashmap
 
-        CodeGen {
+        CodeGen { // return value
             source_path,
             module_name,
             context,
@@ -41,6 +47,7 @@ impl<'ctx> CodeGen<'ctx> {
         }
     }
 
+    // generate all code
     pub fn gen(&mut self, ast: &Vec<GNCAST>) {
         for node in ast {
             match node {
@@ -64,7 +71,7 @@ impl<'ctx> CodeGen<'ctx> {
                     self.builder.position_at_end(func_block);
 
                     // generate IR for statements inside the function body
-                    for statement in func_body.into() {
+                    for statement in func_body {
                         self.gen_statement(statement);
                     }
                     self.addr_map_stack.pop();
@@ -152,20 +159,17 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_expression(&self, expression: &GNCAST) -> IntValue {
         match expression {
             GNCAST::Identifier(ref identifier) => {
-                println!("building identifier");
                 return self.builder.build_load(self.get_point_value(identifier), "load_val").into_int_value();
             }
             GNCAST::IntLiteral(ref int_literal) => {
                 return self.context.i32_type().const_int(*int_literal as u64, true);
             }
             GNCAST::UnaryExpression(ref op, ref expr) => {
-                println!("begin to build unary");
                 match op {
                     UnaryOperator::UnaryMinus => {
                         return self.builder.build_int_neg(self.gen_expression(&*expr), "building neg");
                     }
                     UnaryOperator::LogicalNot => {
-//                        let res = self.gen_expression(&*expr).const_int_compare(IntPredicate::EQ, self.context.i32_type().const_int(0 as u64, true)).const_cast(self.context.i32_type(), true).const_neg();
                         let res = self.builder.build_int_compare(
                             IntPredicate::EQ,
                             self.context.i32_type().const_int(0 as u64, true),
@@ -173,7 +177,6 @@ impl<'ctx> CodeGen<'ctx> {
 
                         let res = self.builder.build_int_cast(res, self.context.i32_type(), "logical not casting");
                         let res = self.builder.build_int_sub(self.context.i32_type().const_int(0 as u64, true), res, "logical not");
-//                        res.print_to_stderr();
                         return res;
                     }
                     UnaryOperator::BitwiseComplement => {
@@ -193,7 +196,7 @@ impl<'ctx> CodeGen<'ctx> {
                     BinaryOperator::Subtract => self.builder.build_int_sub(lhs_v, rhs_v, "i32 sub"),
                     BinaryOperator::Multiply => self.builder.build_int_mul(lhs_v, rhs_v, "i32 mul"),
                     BinaryOperator::Divide => self.builder.build_int_signed_div(lhs_v, rhs_v, "i32 signed div"),
-                    _ => {}
+                    _ => { panic!(); }
                 }
             }
             _ => { panic!("Invalid Expression Type") }

@@ -8,13 +8,16 @@ use pest::prec_climber::Assoc;
 use pest::prec_climber::Operator;
 use parser::BinaryOperator::LogicalOr;
 use parser::UnaryOperator::UnaryMinus;
-use parser::GNCAST::UnaryExpression;
+use parser::GNCAST::{UnaryExpression, BinaryExpression};
 
 #[derive(Parser)]
 #[grammar = "./gnc.pest"]
 struct GNCParser;
 
 
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+//      All the AST Enums
+//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 #[derive(Clone, Copy)]
 pub enum GNCType {
     Void,
@@ -41,13 +44,16 @@ pub enum BinaryOperator {
     Subtract,
     Multiply,
     Divide,
-    LogicalOr,
+    BitwiseAnd,
+    ExclusiveOr,
+    InclusiveOr,
     LogicalAnd,
+    LogicalOr,
 }
 
 pub enum GNCAST {
     // Function AST: return type, name, parameter list and code block
-    Function(GNCType, String, Vec<GNCParameter>, Box<GNCAST>),
+    Function(GNCType, String, Vec<GNCParameter>, Vec<GNCAST>),
     Block(Vec<GNCAST>),
     ReturnStatement(Box<GNCAST>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
@@ -58,6 +64,22 @@ pub enum GNCAST {
     Assignment(String, Box<GNCAST>),
 }
 
+// implement method for GNCAST
+impl GNCAST {
+    // rust cannot infer type inside the enum
+    // so I have to write this method to extract statements from function body
+    fn get_func_body(self) -> Option<Vec<GNCAST>> {
+        if let GNCAST::Block(statements_list) = self { Some(statements_list) } else { None }
+    }
+}
+
+
+//>>>>>>>>>>>>>>>>>>>>>>>>
+//      PARSER
+//<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+// driver for the parser
 pub fn parse(source_path: &str) -> Vec<GNCAST> {
     let mut source_file: File = File::open(source_path).expect("Unable to open source file!");
     let mut source_content: String = String::new();
@@ -104,19 +126,19 @@ fn visit_function(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
     let mut func_identifier: String = String::new();
     let mut func_parameter: Vec<GNCParameter> = vec![];
     let mut func_statements: Vec<GNCAST> = vec![];
-    let mut func_block: GNCAST = GNCAST::Block(func_statements);
 
     for token in pair.into_inner() {
+        println!("{}", token);
         match token.as_rule() {
             Rule::data_type => { func_type = visit_data_type(token); }
             Rule::identifier => { func_identifier = token.as_str().to_string(); }
             Rule::function_parameter_list => { visit_function_parameter_list(token, &mut func_parameter); }
-            Rule::block_statement => { visit_statement(token, &mut func_statements); }
+            Rule::statement => { visit_statement(token, &mut func_statements); }
             _ => { panic!("[ERROR] unexpected token while parsing the function"); }
         }
     }
 
-    ast.push(GNCAST::Function(func_type, func_identifier, func_parameter, Box::new(func_block)));
+    ast.push(GNCAST::Function(func_type, func_identifier, func_parameter, func_statements));
 }
 
 
@@ -142,20 +164,62 @@ fn visit_block(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
 
 
 fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
-    let mut data_type: GNCType = GNCType::Int;
-
     for token in pair.into_inner() {
+        println!("{}", token);
         match token.as_rule() {
             Rule::declaration_statement => {
-                visit_declaration(token, func_statements, data_type.clone())
+                visit_declaration_statement(token, func_statements);
             }
-            Rule::data_type => { data_type = visit_data_type(token) }
+            Rule::assignment_statement => {
+                visit_assignment_statement(token, func_statements);
+            }
             Rule::return_statement => { visit_return_statement(token, func_statements); }
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
         }
     }
 }
 
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+// The basic method for converting some statements to the AST
+// is to traverse the corresponding function and operate on
+// the parameter **func_statements: &mut Vec<GNCAST>**.
+//
+// Each traverse push the AST of the statements onto **func_statements**.
+//<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+fn visit_declaration_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
+    let mut data_type: GNCType = GNCType::Int;
+    let mut variable_name: String = String::new();
+
+    for token in pair.into_inner() {
+        println!("{}", token);
+        match token.as_rule() {
+            Rule::data_type => {
+                data_type = visit_data_type(token);
+            }
+            Rule::declaration => {
+                for inner_token in token.into_inner() {
+                    match inner_token.as_rule() {
+                        Rule::identifier => {
+                            variable_name = inner_token.as_str().to_string();
+                            func_statements.push(GNCAST::Declaration(data_type, variable_name.clone()))
+                        }
+                        Rule::expression => {
+                            func_statements.push(GNCAST::Assignment(variable_name.clone(), Box::new(visit_expression(inner_token))));
+                        }
+                        _ => { panic!() }
+                    }
+                }
+            }
+            _ => { panic!("[ERROR] unexpected token while parsing declaration statement"); }
+        }
+    }
+}
+
+fn visit_assignment_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
+
+}
 
 fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
     for token in pair.into_inner() {
@@ -182,16 +246,17 @@ fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
 
     let mut pairs = pair.into_inner();
     let mut lhs = visit_expression(pairs.next().unwrap());
-    let mut expr = pairs.next();
+    let mut expr = pairs.next(); // now is the symbol
 
     while expr.is_some() {
+        let op = match expr.unwrap().as_str() {
+            "||" => LogicalOr,
+            _ => { panic!() }
+        };
+        expr = pairs.next();
         let rhs = visit_expression(expr.unwrap());
         lhs = GNCAST::BinaryExpression(
-            match pair.as_rule() {
-                Rule::logical_or_expression => BinaryOperator::LogicalOr,
-                Rule::logical_and_expression => BinaryOperator::LogicalAnd,
-                _ => { panic!(""); }
-            },
+            op,
             Box::new(lhs),
             Box::new(rhs),
         );
@@ -209,7 +274,7 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
         return if expr.as_str() == "(" {
             visit_expression(pairs.next().unwrap())
         } else if expr.as_rule() == Rule::int_literal {
-            visit_int_literal(pairs.next().unwrap())
+            visit_int_literal(expr)
         } else if expr.as_rule() == Rule::identifier {
             GNCAST::Identifier(expr.as_str().to_string())
         } else {
@@ -225,51 +290,6 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
         };
     }
     panic!("")
-}
-
-
-// fn visit_expression(pairs: Pair<'_, Rule>) -> GNCAST {
-//     println!("{}", pairs);
-//     PREC_CLIMBER.climb(
-//         pairs.into_inner(),
-//         |pair: Pair<Rule>| match pair.as_rule() {
-//             Rule::int_literal => visit_int_literal(pair),
-//             Rule::identifier => GNCAST::Identifier(pair.as_str().to_string()),
-//             Rule::expression => visit_expression(pair),
-//             Rule::unary_expression => visit_unary(pair),
-//             _ => {
-//                 println!("{}", pair);
-//                 unreachable!()
-//             },
-//         },
-//         |lhs: GNCAST, op: Pair<Rule>, rhs: GNCAST| match op.as_rule() {
-//             Rule::add => GNCAST::BinaryExpression(BinaryOperator::Add, Box::new(lhs), Box::new(rhs)),
-//             Rule::subtract => GNCAST::BinaryExpression(BinaryOperator::Subtract, Box::new(lhs), Box::new(rhs)),
-//             Rule::multiply => GNCAST::BinaryExpression(BinaryOperator::Multiply, Box::new(lhs), Box::new(rhs)),
-//             Rule::divide => GNCAST::BinaryExpression(BinaryOperator::Divide, Box::new(lhs), Box::new(rhs)),
-//             _ => {
-//                 unreachable!()
-//             },
-//         },
-//     )
-// }
-
-
-fn visit_declaration(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>, ty: GNCType) {
-    let mut variable_name: String = String::new();
-
-    for token in pair.into_inner() {
-        match token.as_rule() {
-            Rule::identifier => {
-                variable_name = token.as_str().to_string();
-                func_statements.push(GNCAST::Declaration(ty.clone(), variable_name.clone()));
-            }
-            Rule::expression => {
-                func_statements.push(GNCAST::Assignment(variable_name.clone(), Box::new(visit_expression(token))));
-            }
-            _ => { panic!("[ERROR] unexpected token while parsing return statement"); }
-        }
-    }
 }
 
 

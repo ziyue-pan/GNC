@@ -15,7 +15,7 @@ global_variable = { declaration_statement ~ ";" }
 //>>>>>>>>>>>>>>>>>>>
 //      FUNCTIONS
 //<<<<<<<<<<<<<<<<<<<
-function = { data_type ~ identifier ~ function_parameter_list ~ block_statement }
+function = { data_type ~ identifier ~ function_parameter_list ~ "{" ~ statement* ~ "}" }
 function_parameter_list = { "(" ~ function_parameter* ~ ")" }
 function_parameter = { data_type ~ identifier }
 
@@ -30,7 +30,7 @@ block_statement = { "{" ~ statement* ~ "}" }
 
 statement = {
     declaration_statement ~ ";" |
-    assign_statement ~ ";" | // assignment
+    expression? ~ ";" | // assignment
     if_statement |
     while_statement |
     do_while_statement ~ ";" |
@@ -45,7 +45,7 @@ declaration_statement = {
     data_type ~ ( declaration ~  ",")*  ~ declaration   // declaration
 }
 
-assign_statement = { identifier ~ "=" ~ expression ~ ( "," ~ identifier ~ "=" ~ expression )* }
+// assignment_statement = { identifier ~ "=" ~ expression ~ ( "," ~ identifier ~ "=" ~ expression )* }
 return_statement = { "return" ~ expression }
 if_statement = { "if" ~ "(" ~ expression ~ ")" ~ statement ~ ("else" ~ statement)? }
 while_statement = { "while" ~ "(" ~ expression? ~ ")" }
@@ -57,12 +57,11 @@ do_while_statement = { "do" ~ statement ~ "while" ~ "(" ~ expression? ~ ")" }
 //      EXPRESSIONS
 //<<<<<<<<<<<<<<<<<<<<<
 
-for_condition = { declaration_statement? ~ ";" ~ expression? ~ ";" ~ assign_statement? }
+for_condition = { declaration_statement? ~ ";" ~ expression? ~ ";" ~ assignment_expression? }
 declaration = { identifier ~ ( "=" ~ expression ) ? }
 
 // expression
-expression = { logical_or_expression }
-
+expression = {assignment_expression | logical_or_expression }
 
 unary_expression = {
     "(" ~ expression ~ ")" |
@@ -83,6 +82,10 @@ inclusive_or_expression = { exclusive_or_expression ~ ("|" ~ exclusive_or_expres
 logical_and_expression = { inclusive_or_expression ~ ("&&" ~ inclusive_or_expression)* }
 logical_or_expression = { logical_and_expression ~ ("||" ~ logical_and_expression)* }
 
+assignment_expression = { identifier
+    ~ ("=" | "/=" | "*=" | "%=" | "+=" | "-=" | "<<=" | ">>=" | "&=" | "^=" | "|=" )
+    ~ expression
+}
 
 
 //>>>>>>>>>>>>>>>
