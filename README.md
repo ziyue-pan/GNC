@@ -10,8 +10,8 @@
 - [x] declare local int variable
 - [x] unary operation  
 - [x] binary operation
-- [x] conditional statement
-- [x] loop statement
+- [ ] conditional statement
+- [ ] loop statement
 - [ ] scope 
 - [ ] function
 - [ ] global variable
