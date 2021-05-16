@@ -48,17 +48,26 @@ declaration_statement = {
 // assignment_statement = { identifier ~ "=" ~ expression ~ ( "," ~ identifier ~ "=" ~ expression )* }
 return_statement = { "return" ~ expression }
 if_statement = { "if" ~ "(" ~ expression ~ ")" ~ statement ~ ("else" ~ statement)? }
-while_statement = { "while" ~ "(" ~ expression? ~ ")" }
-for_statement = { "for" ~ "(" ~ for_condition ~ ")" ~ statement }
+while_statement = { "while" ~ "(" ~ expression? ~ ")" ~ statement }
+for_statement = { "for" ~ "("
+    ~ (declaration_statement | expression | none_for_condition)
+    ~ ";" ~ (expression | none_for_condition) ~ ";"
+    ~ (expression | none_for_condition) ~ ")" ~ statement
+}
 do_while_statement = { "do" ~ statement ~ "while" ~ "(" ~ expression? ~ ")" }
+
+
 
 
 //>>>>>>>>>>>>>>>>>>>>>
 //      EXPRESSIONS
 //<<<<<<<<<<<<<<<<<<<<<
-
-for_condition = { declaration_statement? ~ ";" ~ expression? ~ ";" ~ assignment_expression? }
 declaration = { identifier ~ ( "=" ~ expression ) ? }
+
+// this non_for_condition is for parsing process
+// Since I cannot get the number of all clauses in for-loop's condition,
+// i have to mark the empty clause as non_for_condition
+none_for_condition = { "" }
 
 // expression
 expression = {assignment_expression | logical_or_expression }

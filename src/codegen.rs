@@ -131,7 +131,6 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_statement(&mut self, statement: &GNCAST) {
         match statement {
             GNCAST::ReturnStatement(ref ptr_to_expr) => {
-                print_ast(ptr_to_expr, 0);
                 self.builder.build_return(Some(&self.gen_expression(ptr_to_expr)));
             }
             GNCAST::Declaration(ref data_type, ref identifier) => {
@@ -147,7 +146,6 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             GNCAST::Assignment(ref op, ref identifier, ref ptr_to_expr) => {
-                print_ast(ptr_to_expr, 0);
                 self.builder.build_store(self.get_point_value(identifier), self.gen_expression(&*ptr_to_expr));
             }
             _ => {
@@ -201,42 +199,5 @@ impl<'ctx> CodeGen<'ctx> {
             }
             _ => { panic!("Invalid Expression Type") }
         }
-    }
-}
-
-fn print_ast(tree: &GNCAST, indent: usize) {
-    match tree {
-        GNCAST::Function(ref ty, ref name, ref parm, ref vec) => {
-            println!("function {}", name);
-            for node in vec {
-                print_ast(node, indent + 1);
-            }
-        }
-        GNCAST::ReturnStatement(ref statements) => {
-            println!("{}Returning", "    ".repeat(indent));
-            print_ast(statements, indent + 1);
-        }
-        GNCAST::UnaryExpression(ref op, ref ast) => {
-            println!("{}unary expr:", "    ".repeat(indent));
-            print_ast(ast, indent + 1);
-        }
-        GNCAST::BinaryExpression(ref op, ref lhs, ref rhs) => {
-            println!("{}binary expr:", "    ".repeat(indent));
-            print_ast(lhs, indent + 1);
-            println!("{} bin_op", "    ".repeat(indent + 1));
-            print_ast(rhs, indent + 1);
-        }
-        GNCAST::IntLiteral(ref val) => {
-            println!("{}{}", "    ".repeat(indent), val);
-        }
-        GNCAST::Identifier((ref id)) => println!("{}{}", "    ".repeat(indent), id),
-        GNCAST::Declaration(ref ty, ref id) => {
-            println!("{}declaration: {}", "    ".repeat(indent), id);
-        }
-        GNCAST::Assignment(ref op, ref id, ref ast) => {
-            println!("{}assignment", "    ".repeat(indent));
-            print_ast(ast, indent + 1);
-        }
-        _ => {}
     }
 }
