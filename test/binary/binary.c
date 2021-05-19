@@ -13,6 +13,7 @@ int mul() {
 }
 
 int div() {
+    int b = 2;
     int a = 3 / b;
     return b;
 }
