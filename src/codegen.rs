@@ -195,23 +195,6 @@ impl<'ctx> CodeGen<'ctx> {
                     BinaryOperator::Subtract => self.builder.build_int_sub(lhs_v, rhs_v, "i32 sub"),
                     BinaryOperator::Multiply => self.builder.build_int_mul(lhs_v, rhs_v, "i32 mul"),
                     BinaryOperator::Divide => self.builder.build_int_signed_div(lhs_v, rhs_v, "i32 signed div"),
-<<<<<<< HEAD
-                    // TODO binary codegen
-                    // BinaryOperator::Modulus => self.builder.build_int_
-                    // BinaryOperator::Equal => self.builder.build_int_
-                    // BinaryOperator::ShiftRight => self.builder.build_int_
-                    // BinaryOperator::ShiftLeft => self.builder.build_int_
-                    // BinaryOperator::LessThan => self.builder.build_int_
-                    // BinaryOperator::GreaterThan => self.builder.build_int_
-                    // BinaryOperator::LessEqual => self.builder.build_int_
-                    // BinaryOperator::GreaterEqual => self.builder.build_int_
-                    // BinaryOperator::NotEqual => self.builder.build_int_
-                    // BinaryOperator::BitwiseAnd => self.builder.build_int_
-                    // BinaryOperator::ExclusiveOr => self.builder.build_int_
-                    // BinaryOperator::InclusiveOr => self.builder.build_int_
-                    // BinaryOperator::LogicalAnd => self.builder.build_int_
-                    // BinaryOperator::LogicalOr => self.builder.build_int_
-=======
                     // BinaryOperator::ShiftRight => {}
                     // BinaryOperator::ShiftLeft => {}
                     // BinaryOperator::NotEqual => {}
@@ -225,7 +208,6 @@ impl<'ctx> CodeGen<'ctx> {
                     // BinaryOperator::InclusiveOr => {}
                     // BinaryOperator::LogicalAnd => {}
                     // BinaryOperator::LogicalOr => {}
->>>>>>> 3b450ae648407bd3930745f1958181255d019d2d
                     _ => { panic!(); }
                 }
             }
