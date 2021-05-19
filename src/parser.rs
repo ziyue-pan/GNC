@@ -382,6 +382,7 @@ fn visit_for_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) 
 //      expressions
 //<<<<<<<<<<<<<<<<<<<<<<<<<<
 fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
+    println!("in visit_expression; {}", pair);
     return if pair.as_rule() == Rule::assignment_expression {
         visit_assignment(pair)
     } else if pair.as_rule() == Rule::unary_expression {
@@ -423,6 +424,7 @@ fn visit_assignment(pair: Pair<'_, Rule>) -> GNCAST {
 }
 
 fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
+    println!("in binary: {}", pair);
     let mut pairs = pair.into_inner();
 
     let mut lhs = visit_expression(pairs.next().unwrap());
@@ -464,6 +466,8 @@ fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
 
 
 fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
+    println!("in unary: {}", pair);
+
     let mut pairs = pair.into_inner();
     let mut pair = pairs.next();
 
@@ -483,7 +487,7 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
                     Rule::op_bitwise_not => UnaryOperator::BitwiseComplement,
                     _ => { panic!() }
                 },
-                Box::new(visit_expression(expr)),
+                Box::new(visit_expression(pairs.next().unwrap())),
             )
         };
     }
