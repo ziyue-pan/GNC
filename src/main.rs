@@ -84,14 +84,14 @@ mod tests {
             bitcode_path.push_str("bc");
 
             println!(">>> Start compiling {} <<<", source_path.blue());
-            // let ast = parser::parse(source_path);
-            //
-            // let context = Context::create();
-            // let mut code_gen = CodeGen::new(&context, source_path);
-            // code_gen.gen(&ast);
-            //
-            // Command::new("sh").arg("-c").arg("llvm-dis ".to_owned() + bitcode_path.as_str())
-            //     .output().expect("file to disassemble llvm bitcode");
+            let ast = parser::parse(source_path);
+
+            let context = Context::create();
+            let mut code_gen = CodeGen::new(&context, source_path);
+            code_gen.gen(&ast);
+
+            Command::new("sh").arg("-c").arg("llvm-dis ".to_owned() + bitcode_path.as_str())
+                .output().expect("file to disassemble llvm bitcode");
             println!(">>> done <<<")
         }
     }
