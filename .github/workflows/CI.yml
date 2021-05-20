@@ -1,5 +1,7 @@
 on: [push]
 
+name: CI
+
 jobs:
   test:
     name: Build and Test
