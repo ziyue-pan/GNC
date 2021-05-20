@@ -1,4 +1,4 @@
-name: GitHub Actions Deploy CI
+name: Deploy CD
 on:
   push:
     tags:
