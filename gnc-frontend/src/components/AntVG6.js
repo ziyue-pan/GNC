@@ -1,20 +1,23 @@
 import React, {useEffect} from 'react';
 import ReactDOM from 'react-dom';
 import G6 from '@antv/g6';
-import data from './test.json';
 
 export default function AntVTree(props) {
+    const style = {
+        display: 'flex',
+        flex: '1 1 auto'
+    }
     const ref = React.useRef(null);
     let graph = null;
 
     useEffect(() => {
-        console.log(data)
+        const {width, height} = ref.current.getBoundingClientRect()
         if (!graph) {
             // eslint-disable-next-line
             graph = new G6.TreeGraph({
                 container: ReactDOM.findDOMNode(ref.current),
-                width: 550,
-                height: 700,
+                width: width,
+                height: height,
                 linkCenter: true,
                 modes: {
                     default: [
@@ -80,10 +83,10 @@ export default function AntVTree(props) {
                 },
             };
         });
-        graph.data(data);
+        graph.data(props.data);
         graph.render();
         graph.fitView();
     }, []);
 
-    return <div ref={ref}/>;
+    return <div style={style} ref={ref}/>;
 }

@@ -46,7 +46,7 @@ function App() {
                 <CardContainer>
                     <Card>
                         <div className={'flex flex-auto flex-col h-full'}>
-                            <div className={'flex flex-auto pb-2'}>
+                            <div className={'flex flex-grow-0 pb-2'}>
                                 <Button>Run</Button>
                             </div>
                             <div className={'flex flex-auto'}>
@@ -62,10 +62,10 @@ function App() {
                 <CardContainer>
                     <Card>
                         <div className={'flex flex-auto flex-col h-full'}>
-                            <div className={'flex flex-auto pb-2'}>
+                            <div className={'flex flex-grow-0 pb-2'}>
                                 <Button>Compile</Button>
                             </div>
-                            <div className={'flex flex-auto'}>
+                            <div className={'flex flex-auto flex-row'}>
                                 <AntVTree
                                     data={mockASTData}
                                 />
