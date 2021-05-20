@@ -17,6 +17,7 @@ export function Card(props) {
                 <div className={'flex flex-auto flex-col h-full'}>
                     <div className={'flex flex-grow-0 flex-row p-2 bg-green-600'}>
                         {props.left}
+                        <div className={'flex flex-grow'}/>
                         {props.right}
                     </div>
                     <div className={'flex flex-auto flex-row p-2'}>

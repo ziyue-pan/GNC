@@ -24,7 +24,7 @@ const Footer = styled.footer.attrs({
 `;
 
 const CardLabelText = styled.span.attrs({
-    className: "flex flex-grow text-white text-3xl object-center font-bold pl-2 pt-1 pr-3"
+    className: "flex text-white text-3xl object-center font-bold pl-2 pt-1"
 })``;
 
 const Title = styled.span.attrs({
@@ -33,8 +33,16 @@ const Title = styled.span.attrs({
     line-height: 15vh;
 `;
 
+const Input = styled.input.attrs({
+    className: "text-green-900 rounded-lg shadow-md border-2 border-green-500"
+})``;
+
+const InitialCode = `int main (int a) {
+    return a;
+}`
+
 function App() {
-    const [code, editCode] = useState('#include <stdio.h>\nint main(){}')
+    const [code, editCode] = useState(InitialCode)
     return (
         <div className={'bg-green-100'}>
             <Header>
@@ -61,7 +69,13 @@ function App() {
                     }
                 />
                 <Card
-                    left={<CardLabelText>Parse Tree</CardLabelText>}
+                    left={
+                        <div className={'flex flex-row'}>
+                            <CardLabelText>Parse Tree</CardLabelText>
+                            <CardLabelText>/</CardLabelText>
+                            <CardLabelText className={'text-opacity-50'}>AST</CardLabelText>
+                        </div>
+                    }
                     right={<Button>Compile</Button>}
                     content={
                         <AntVTree
@@ -73,7 +87,13 @@ function App() {
                     left={<CardLabelText>Running Result</CardLabelText>}
                     right={<Button>Run</Button>}
                     content={
-                        <div/>
+                        <div>
+                            function: `main()`
+                            <br/>
+                            a: <Input/>
+                            <br/>
+                            res: 23333
+                        </div>
                     }
                 />
             </div>
