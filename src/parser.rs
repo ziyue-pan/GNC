@@ -130,8 +130,6 @@ fn visit_gnc(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
     }
 
     for token in pair.into_inner() {
-        println!("{}", token);
-
         match token.as_rule() {
             Rule::function => {
                 visit_function(token, ast);
@@ -155,7 +153,6 @@ fn visit_function(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
     let mut func_statements: Vec<GNCAST> = vec![];
 
     for token in pair.into_inner() {
-        println!("{}", token);
         match token.as_rule() {
             Rule::data_type => { func_type = visit_data_type(token); }
             Rule::identifier => { func_identifier = token.as_str().to_string(); }
@@ -193,7 +190,6 @@ fn visit_block(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
 
 fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
     for token in pair.into_inner() {
-        println!("{}", token);
         match token.as_rule() {
             Rule::declaration_statement => {
                 visit_declaration_statement(token, func_statements);
@@ -270,7 +266,6 @@ fn visit_declaration_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<G
     let mut variable_name: String = String::new();
 
     for token in pair.into_inner() {
-        println!("{}", token);
         match token.as_rule() {
             Rule::data_type => {
                 data_type = visit_data_type(token);
@@ -382,7 +377,6 @@ fn visit_for_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) 
 //      expressions
 //<<<<<<<<<<<<<<<<<<<<<<<<<<
 fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
-    println!("in visit_expression; {}", pair);
     return if pair.as_rule() == Rule::assignment_expression {
         visit_assignment(pair)
     } else if pair.as_rule() == Rule::unary_expression {
@@ -424,7 +418,6 @@ fn visit_assignment(pair: Pair<'_, Rule>) -> GNCAST {
 }
 
 fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
-    println!("in binary: {}", pair);
     let mut pairs = pair.into_inner();
 
     let mut lhs = visit_expression(pairs.next().unwrap());
@@ -466,8 +459,6 @@ fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
 
 
 fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
-    println!("in unary: {}", pair);
-
     let mut pairs = pair.into_inner();
     let mut pair = pairs.next();
 

@@ -6,6 +6,7 @@ extern crate inkwell;
 extern crate colored;
 #[macro_use(lazy_static)]
 extern crate lazy_static;
+extern crate walkdir;
 
 
 use clap::{App, Arg};
@@ -61,64 +62,43 @@ fn main() {
 mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
+    use walkdir::WalkDir;
+    use colored::{Colorize, ColoredString};
+    use std::path::PathBuf;
 
     #[test]
-    fn test_all() {
-        let file_path = "./test/all/all.c";
+    fn test_compile() {
+        for entry in WalkDir::new("./test")
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_type().is_dir())
+        {
+            let raw_path = entry.path().to_str();
+            if raw_path.is_none() { continue; }
 
-        let ast = parser::parse(file_path);
+            let source_path = raw_path.unwrap();
+            if !source_path.ends_with(".c") { continue; }
 
-        checker::check(&ast);
+            let mut bitcode_path = String::from(source_path);
+            bitcode_path.pop();
+            bitcode_path.push_str("bc");
 
-        let context = Context::create();
-        let mut code_gen = CodeGen::new(&context, file_path);
-        code_gen.gen(&ast);
-
-        Command::new("sh").arg("-c").arg("llvm-dis test/basic/basic.bc").output().expect("failed to execute process");
+            println!(">>> Start compiling {} <<<", source_path.blue());
+            // let ast = parser::parse(source_path);
+            //
+            // let context = Context::create();
+            // let mut code_gen = CodeGen::new(&context, source_path);
+            // code_gen.gen(&ast);
+            //
+            // Command::new("sh").arg("-c").arg("llvm-dis ".to_owned() + bitcode_path.as_str())
+            //     .output().expect("file to disassemble llvm bitcode");
+            println!(">>> done <<<")
+        }
     }
 
-    #[test]
-    fn test_basic() {
-        let file_path = "./test/basic/basic.c";
-
-        let ast = parser::parse(file_path);
-
-        checker::check(&ast);
-
-        let context = Context::create();
-        let mut code_gen = CodeGen::new(&context, file_path);
-        code_gen.gen(&ast);
-
-        Command::new("sh").arg("-c").arg("llvm-dis test/basic/basic.bc").output().expect("failed to execute process");
-    }
 
     #[test]
-    fn test_unary() {
-        let file_path = "./test/unary/unary.c";
-
-        let ast = parser::parse(file_path);
-
-        checker::check(&ast);
-
-        let context = Context::create();
-        let mut code_gen = CodeGen::new(&context, file_path);
-        code_gen.gen(&ast);
-
-        Command::new("sh").arg("-c").arg("llvm-dis test/unary/unary.bc").output().expect("failed to execute process");
-    }
-
-    #[test]
-    fn test_binary() {
-        let file_path = "./test/binary/binary.c";
-
-        let ast = parser::parse(file_path);
-
-        checker::check(&ast);
-
-        let context = Context::create();
-        let mut code_gen = CodeGen::new(&context, file_path);
-        code_gen.gen(&ast);
-
-        Command::new("sh").arg("-c").arg("llvm-dis test/binary/binary.bc").output().expect("failed to execute process");
+    fn test_correctness() {
+        // TODO
     }
 }

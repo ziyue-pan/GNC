@@ -76,6 +76,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                     self.addr_map_stack.pop();
                 }
+
                 // TODO Update global hashmap: addr_map_stack[addr_map_stack.len() - 1].insert(identifier, PointerValue);
                 _ => { panic!(); }
             }
@@ -186,7 +187,6 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 }
             }
-            // TODO add binary expression
             GNCAST::BinaryExpression(ref op, ref lhs, ref rhs) => {
                 let lhs_v = self.gen_expression(lhs);
                 let rhs_v = self.gen_expression(rhs);
@@ -195,19 +195,28 @@ impl<'ctx> CodeGen<'ctx> {
                     BinaryOperator::Subtract => self.builder.build_int_sub(lhs_v, rhs_v, "i32 sub"),
                     BinaryOperator::Multiply => self.builder.build_int_mul(lhs_v, rhs_v, "i32 mul"),
                     BinaryOperator::Divide => self.builder.build_int_signed_div(lhs_v, rhs_v, "i32 signed div"),
-                    // BinaryOperator::ShiftRight => {}
-                    // BinaryOperator::ShiftLeft => {}
-                    // BinaryOperator::NotEqual => {}
-                    // BinaryOperator::Equal => {}
-                    // BinaryOperator::GreaterThan => {}
-                    // BinaryOperator::LessEqual => {}
-                    // BinaryOperator::GreaterEqual => {}
-                    // BinaryOperator::LessThan => {}
-                    // BinaryOperator::BitwiseAnd => {}
-                    // BinaryOperator::ExclusiveOr => {}
-                    // BinaryOperator::InclusiveOr => {}
-                    // BinaryOperator::LogicalAnd => {}
-                    // BinaryOperator::LogicalOr => {}
+                    BinaryOperator::Modulus => self.builder.build_int_signed_rem(lhs_v, rhs_v, "mod"),
+                    BinaryOperator::ShiftRight => self.builder.build_right_shift(lhs_v, rhs_v, true, "shr"),
+                    BinaryOperator::ShiftLeft => self.builder.build_left_shift(lhs_v, rhs_v, "shl"),
+                    BinaryOperator::NotEqual => self.builder.build_int_compare(IntPredicate::NE, lhs_v, rhs_v, "ne"),
+                    BinaryOperator::Equal => self.builder.build_int_compare(IntPredicate::EQ, lhs_v, rhs_v, "eq"),
+                    BinaryOperator::GreaterThan => self.builder.build_int_compare(IntPredicate::SGT, lhs_v, rhs_v, "gt"),
+                    BinaryOperator::GreaterEqual => self.builder.build_int_compare(IntPredicate::SGE, lhs_v, rhs_v, "ge"),
+                    BinaryOperator::LessThan => self.builder.build_int_compare(IntPredicate::SLT, lhs_v, rhs_v, "lt"),
+                    BinaryOperator::LessEqual => self.builder.build_int_compare(IntPredicate::SLE, lhs_v, rhs_v, "le"),
+                    BinaryOperator::BitwiseAnd => self.builder.build_and(lhs_v, rhs_v, "and"),
+                    BinaryOperator::ExclusiveOr => self.builder.build_xor(lhs_v, rhs_v, "xor"),
+                    BinaryOperator::InclusiveOr => self.builder.build_or(lhs_v, rhs_v, "or"),
+                    BinaryOperator::LogicalAnd => self.builder.build_and(
+                        self.builder.build_int_cast(lhs_v, self.context.bool_type(), "cast i32 to i1"),
+                        self.builder.build_int_cast(rhs_v, self.context.bool_type(), "cast i32 to i1"),
+                        "logical and",
+                    ),
+                    BinaryOperator::LogicalOr => self.builder.build_or(
+                        self.builder.build_int_cast(lhs_v, self.context.bool_type(), "cast i32 to i1"),
+                        self.builder.build_int_cast(rhs_v, self.context.bool_type(), "cast i32 to i1"),
+                        "logical or",
+                    ),
                     _ => { panic!(); }
                 }
             }

@@ -3,9 +3,10 @@ name = "GNC"
 version = "0.1.0"
 
 [dependencies]
-clap = "2.33.3"         # cli-app框架
-pest = "2.1.3"          # lexer工具
-pest_derive = "2.1.0"   # lexer派生宏
+clap = "2.33.3"
+pest = "2.1.3"
+pest_derive = "2.1.0"
 inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm11-0"] }
-colored = "2.0.0"       # 终端着色工具
+colored = "2.0.0"
 lazy_static = "1.4.0"   # For efficiency
+walkdir = "2.3.2"
