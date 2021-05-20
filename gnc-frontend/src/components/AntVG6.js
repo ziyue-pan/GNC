@@ -72,6 +72,10 @@ export default function AntVTree(props) {
                 rotate = Math.PI / 2;
             }
             return {
+                style: {
+                    fill: '#ECFDF5',
+                    stroke: '#34D399',
+                },
                 label: node.id,
                 labelCfg: {
                     position,
