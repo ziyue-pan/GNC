@@ -1,6 +1,6 @@
 # GNC 
 
-[![Build Status](https://github.com/PAN-Ziyue/GNC/workflows/build/badge.svg?event=push)](https://github.com/PAN-Ziyue/GNC/actions?workflow=build)
+[![Build Status](https://github.com/PAN-Ziyue/GNC/workflows/CI/badge.svg?event=push)](https://github.com/PAN-Ziyue/GNC/actions?workflow=CI)
 
 **GNC** is **N**ot **C**. It is intended for a better and more effective c language.
 
