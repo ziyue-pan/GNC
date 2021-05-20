@@ -1,8 +1,6 @@
-const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
+const { override, addPostcssPlugins } = require('customize-cra')
 
-module.exports = function override(config, env) {
-    config.plugins.push(new MonacoWebpackPlugin({
-        languages: ['cpp']
-    }));
-    return config;
-}
+module.exports = override (
+    addPostcssPlugins([require('tailwindcss')]),
+    addPostcssPlugins([require('autoprefixer')])
+)
