@@ -54,6 +54,7 @@ function App() {
                     content={
                         <Editor
                             defaultLanguage="c"
+                            theme="light"
                             onChange={editCode}
                             value={code}
                         />
