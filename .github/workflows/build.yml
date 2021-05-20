@@ -4,32 +4,12 @@ jobs:
   test:
     name: Test
     runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        build: [stable, beta, nightly, macos, windows, msrv]
-        include:
-          - build: stable
-            os: ubuntu-latest
-            rust: stable
-          - build: beta
-            os: ubuntu-latest
-            rust: beta
-          - build: nightly
-            os: ubuntu-latest
-            rust: nightly
-          - build: macos
-            os: macos-latest
-            rust: stable
-          - build: windows
-            os: windows-latest
-            rust: stable
-          - build: msrv
-            os: ubuntu-latest
-            rust: 1.42.0
     steps:
     - uses: actions/checkout@master
     - name: Install Rust
-      run: bash ci/install-rust.sh ${{ matrix.rust }}
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
     - name: Build and run tests
       run: cargo test
     - name: Test no default
