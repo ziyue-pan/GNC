@@ -20,27 +20,31 @@ struct GNCParser;
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 //      All the AST Enums
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum GNCType {
     Void,
     Int,
 }
 
+#[derive(Debug)]
 pub struct GNCParameter {
     param_type: GNCType,
     param_name: String,
 }
 
+#[derive(Debug)]
 pub enum GNCStatement {
     Return(String),
 }
 
+#[derive(Debug)]
 pub enum UnaryOperator {
     UnaryMinus,
     LogicalNot,
     BitwiseComplement,
 }
 
+#[derive(Debug)]
 pub enum BinaryOperator {
     Add,
     Subtract,
@@ -62,6 +66,7 @@ pub enum BinaryOperator {
     LogicalOr,
 }
 
+#[derive(Debug)]
 pub enum AssignOperation {
     Simple,
     Addition,
@@ -76,6 +81,7 @@ pub enum AssignOperation {
     ShiftRight,
 }
 
+#[derive(Debug)]
 pub enum GNCAST {
     // Function AST: return type, name, parameter list and code block
     Function(GNCType, String, Vec<GNCParameter>, Vec<GNCAST>),

@@ -18,6 +18,7 @@ ignore/
 
 *.swp
 *.asm
+*.wasm
 
 *.out
 *.ll

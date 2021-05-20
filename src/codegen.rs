@@ -89,6 +89,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // set llvm target
         Target::initialize_native(&InitializationConfig::default()).expect("Failed to initialize native target");
+        // Target::initialize_webassembly(&InitializationConfig::default());
 
         let triple = TargetMachine::get_default_triple();
         let cpu = TargetMachine::get_host_cpu_name().to_string();
@@ -130,6 +131,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
     fn gen_statement(&mut self, statement: &GNCAST) {
+        println!("in gen_statement {:?}", statement);
         match statement {
             GNCAST::ReturnStatement(ref ptr_to_expr) => {
                 self.builder.build_return(Some(&self.gen_expression(ptr_to_expr)));

@@ -30,12 +30,12 @@ block_statement = { "{" ~ statement* ~ "}" }
 
 statement = {
     declaration_statement ~ ";" |
+    return_statement ~ ";" |
     expression? ~ ";" | // assignment
     if_statement |
     while_statement |
     do_while_statement ~ ";" |
     for_statement |
-    return_statement ~ ";" |
     block_statement
 }
 
