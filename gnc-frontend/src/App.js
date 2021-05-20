@@ -2,6 +2,8 @@ import './App.css';
 import {useState} from "react";
 import styled from 'styled-components'
 import Editor from "@monaco-editor/react";
+import AntVTree from "./components/AntVG6";
+import mockASTData from './components/test.json';
 
 const Button = styled.button.attrs({
     className: "flex flex-grow-0 py-2 px-4 font-semibold rounded-lg shadow-md text-white bg-green-500 hover:bg-green-700"
@@ -59,7 +61,16 @@ function App() {
                 </CardContainer>
                 <CardContainer>
                     <Card>
-                        <Button>Compile</Button>
+                        <div className={'flex flex-auto flex-col h-full'}>
+                            <div className={'flex flex-auto pb-2'}>
+                                <Button>Compile</Button>
+                            </div>
+                            <div className={'flex flex-auto'}>
+                                <AntVTree
+                                    data={mockASTData}
+                                />
+                            </div>
+                        </div>
                     </Card>
                 </CardContainer>
                 <CardContainer>
