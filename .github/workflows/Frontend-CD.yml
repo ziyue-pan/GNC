@@ -20,10 +20,10 @@ jobs:
       - name: Install Dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: cd gnc-frontend && yarn install
-      - name: Build and Deploy
+      - name: Install and Build
+        run: cd gnc-frontend && yarn build
+      - name: Deploy
         uses: JamesIves/github-pages-deploy-action@4.1.3
-        env:
-          ACCESS_TOKEN: ${{ secrets.GITHUB_ACCESS_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: gnc-frontend/build
-          BUILD_SCRIPT: cd gnc-frontend && yarn build
+        with:
+          branch: gh-pages
+          folder: gnc-frontend/build
