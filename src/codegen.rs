@@ -4,11 +4,10 @@ use std::path::{Path, PathBuf};
 use std::collections::{HashMap, VecDeque};
 use parser::{GNCAST, GNCType, UnaryOperator, BinaryOperator, AssignOperation, GNCParameter};
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
-use inkwell::{IntPredicate, AddressSpace};
+use inkwell::{IntPredicate};
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
-use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue};
-use parser::GNCAST::BinaryExpression;
+use inkwell::values::{PointerValue, IntValue, FunctionValue};
 use inkwell::basic_block::BasicBlock;
 
 
@@ -139,7 +138,6 @@ impl<'ctx> CodeGen<'ctx> {
 
 
         // build terminator for each non-terminated block
-
         let mut iter_block = func.get_first_basic_block();
         while iter_block.is_some() {
             let block = iter_block.unwrap();
@@ -316,6 +314,24 @@ impl<'ctx> CodeGen<'ctx> {
         // build before block
         self.builder.position_at_end(before_block);
         let cond_val = self.gen_expression(cond);
+
+        // build while conditional branch
+        self.builder.build_conditional_branch(cond_val,
+                                              while_block,
+                                              after_block);
+        self.builder.position_at_end(while_block);
+
+        // build while block
+        self.build_block(while_statements);
+        if self.no_terminator() {
+            self.builder.build_unconditional_branch(before_block);
+        }
+
+        // position to after block
+        self.builder.position_at_end(after_block);
+
+        self.break_labels.pop_back();
+        self.continue_labels.pop_back();
     }
 
     // generate do-while statements
