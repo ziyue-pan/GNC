@@ -245,6 +245,20 @@ impl<'ctx> CodeGen<'ctx> {
                     self.gen_while_statements(cond, while_statements);
                 }
             }
+            GNCAST::ContinueStatement => {
+                if self.continue_labels.is_empty() {
+                    panic!();
+                }
+                let continue_block = self.continue_labels.back().unwrap();
+                self.builder.build_unconditional_branch(*continue_block);
+            }
+            GNCAST::BreakStatement => {
+                if self.break_labels.is_empty() {
+                    panic!();
+                }
+                let break_block = self.break_labels.back().unwrap();
+                self.builder.build_unconditional_branch(*break_block);
+            }
             _ => {
                 panic!("Invalid Statement");
             }
