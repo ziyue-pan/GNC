@@ -29,6 +29,8 @@ function_parameter = { data_type ~ identifier }
 block_statement = { "{" ~ statement* ~ "}" }
 
 statement = {
+    continue_statement |
+    break_statement |
     declaration_statement ~ ";" |
     return_statement ~ ";" |
     expression? ~ ";" | // assignment
@@ -46,7 +48,7 @@ declaration_statement = {
 }
 
 // assignment_statement = { identifier ~ "=" ~ expression ~ ( "," ~ identifier ~ "=" ~ expression )* }
-return_statement = { "return" ~ expression }
+return_statement = { "return" ~ expression? }
 if_statement = { "if" ~ "(" ~ expression ~ ")" ~ statement ~ ("else" ~ statement)? }
 while_statement = { "while" ~ "(" ~ expression? ~ ")" ~ statement }
 for_statement = { "for" ~ "("
@@ -55,8 +57,8 @@ for_statement = { "for" ~ "("
     ~ (expression | none_for_condition) ~ ")" ~ statement
 }
 do_while_statement = { "do" ~ statement ~ "while" ~ "(" ~ expression? ~ ")" }
-
-
+continue_statement = { "continue" }
+break_statement = { "break" }
 
 
 //>>>>>>>>>>>>>>>>>>>>>

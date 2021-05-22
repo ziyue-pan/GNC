@@ -1,16 +1,8 @@
 use pest::Parser;
-use pest::iterators::{Pair, Pairs};
-use pest::error::Error;
-use std::fs::{File, metadata};
+use pest::iterators::{Pair};
+use std::fs::{File};
 use std::io::Read;
-use pest::prec_climber::PrecClimber;
-use pest::prec_climber::Assoc;
-use pest::prec_climber::Operator;
-use parser::BinaryOperator::{LogicalOr, LogicalAnd};
-use parser::UnaryOperator::UnaryMinus;
-use parser::GNCAST::{UnaryExpression, BinaryExpression, Assignment};
-use parser::AssignOperation::Simple;
-use std::ptr::null;
+
 
 #[derive(Parser)]
 #[grammar = "./gnc.pest"]
@@ -30,11 +22,6 @@ pub enum GNCType {
 pub struct GNCParameter {
     param_type: GNCType,
     param_name: String,
-}
-
-#[derive(Debug)]
-pub enum GNCStatement {
-    Return(String),
 }
 
 #[derive(Debug)]
@@ -64,6 +51,7 @@ pub enum BinaryOperator {
     InclusiveOr,
     LogicalAnd,
     LogicalOr,
+    FetchRHS,
 }
 
 #[derive(Debug)]
@@ -87,17 +75,22 @@ pub enum GNCAST {
     Function(GNCType, String, Vec<GNCParameter>, Vec<GNCAST>),
 
     // If Statement AST: expression, if-statement-list, else_statements
-    IfStatement(Box<GNCAST>, Vec<GNCAST>, Vec<GNCAST>),
+    IfStatement(Box<GNCAST>, Box<GNCAST>, Box<GNCAST>),
 
     // While Statement AST: is_do_while, condition, while_statements
-    WhileStatement(bool, Box<GNCAST>, Vec<GNCAST>),
+    WhileStatement(bool, Box<GNCAST>, Box<GNCAST>),
 
     // For Statement AST: init_clause, condition, iteration, for_statements
     //      To support declaration in the init clause, we have
     // to set the first parameter as Vec.
-    ForStatement(Vec<GNCAST>, Box<Option<GNCAST>>, Box<Option<GNCAST>>, Vec<GNCAST>),
+    ForStatement(Vec<GNCAST>, Box<Option<GNCAST>>, Box<Option<GNCAST>>, Box<GNCAST>),
 
-    ReturnStatement(Box<GNCAST>),
+    // Statements block: (a new scope)
+    BlockStatement(Vec<GNCAST>),
+
+    ContinueStatement,
+    BreakStatement,
+    ReturnStatement(Box<Option<GNCAST>>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
     BinaryExpression(BinaryOperator, Box<GNCAST>, Box<GNCAST>),
     IntLiteral(i32),
@@ -216,6 +209,15 @@ fn visit_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
             Rule::for_statement => {
                 visit_for_statement(token, func_statements);
             }
+            Rule::block_statement => {
+                visit_block(token, func_statements);
+            }
+            Rule::continue_statement => {
+                func_statements.push(GNCAST::ContinueStatement);
+            }
+            Rule::break_statement => {
+                func_statements.push(GNCAST::BreakStatement);
+            }
             Rule::return_statement => { visit_return_statement(token, func_statements); }
             _ => { panic!("[ERROR] unexpected token while parsing statements"); }
         }
@@ -258,9 +260,11 @@ fn visit_if_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
     }
 
     if condition.is_some() {
+        let if_block = GNCAST::BlockStatement(if_statements);
+        let else_block = GNCAST::BlockStatement(else_statements);
         func_statements.push(GNCAST::IfStatement(Box::new(condition.unwrap()),
-                                                 if_statements,
-                                                 else_statements));
+                                                 Box::new(if_block),
+                                                 Box::new(else_block)));
     } else {
         panic!()
     }
@@ -299,14 +303,19 @@ fn visit_declaration_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<G
 
 
 fn visit_return_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) {
-    for token in pair.into_inner() {
-        match token.as_rule() {
-            Rule::expression => {
-                let return_expression = visit_expression(token);
-                func_statements.push(GNCAST::ReturnStatement(Box::new(return_expression)));
-            }
-            _ => { panic!("[ERROR] unexpected token while parsing return statement"); }
-        }
+    let token = pair.into_inner().next();
+
+    if token.is_some() {
+        let expr = token.unwrap();
+
+        let return_expression = visit_expression(expr);
+        func_statements.push(
+            GNCAST::ReturnStatement(Box::new(Some(return_expression)))
+        );
+    } else {
+        func_statements.push(
+            GNCAST::ReturnStatement(Box::new(None))
+        );
     }
 }
 
@@ -328,7 +337,10 @@ fn visit_while_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>
     }
 
     if condition.is_some() {
-        func_statements.push(GNCAST::WhileStatement(is_do_while, Box::new(condition.unwrap()), while_statements));
+        let while_block = GNCAST::BlockStatement(while_statements);
+        func_statements.push(GNCAST::WhileStatement(is_do_while,
+                                                    Box::new(condition.unwrap()),
+                                                    Box::new(while_block)));
     } else {
         panic!();
     }
@@ -373,10 +385,11 @@ fn visit_for_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<GNCAST>) 
         count += 1;
     }
 
+    let for_block = GNCAST::BlockStatement(for_statements);
     func_statements.push(GNCAST::ForStatement(init_clause,
                                               Box::new(condition),
                                               Box::new(iteration),
-                                              for_statements));
+                                              Box::new(for_block)));
 }
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -466,7 +479,7 @@ fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
 
 fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
     let mut pairs = pair.into_inner();
-    let mut pair = pairs.next();
+    let pair = pairs.next();
 
     if pair.is_some() {
         let expr = pair.unwrap();

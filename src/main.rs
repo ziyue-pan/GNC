@@ -4,16 +4,10 @@ extern crate pest;
 extern crate pest_derive;
 extern crate inkwell;
 extern crate colored;
-#[macro_use(lazy_static)]
-extern crate lazy_static;
 extern crate walkdir;
 
 
 use clap::{App, Arg};
-use std::path::Path;
-use std::borrow::Borrow;
-use std::fs::File;
-use std::io::Read;
 use std::process::Command;
 use inkwell::context::Context;
 
@@ -63,8 +57,7 @@ mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
     use walkdir::WalkDir;
-    use colored::{Colorize, ColoredString};
-    use std::path::PathBuf;
+    use colored::{Colorize};
 
     #[test]
     fn test_compile() {
@@ -90,8 +83,11 @@ mod tests {
             let mut code_gen = CodeGen::new(&context, source_path);
             code_gen.gen(&ast);
 
+            // generate llvm-ir code
             Command::new("sh").arg("-c").arg("llvm-dis ".to_owned() + bitcode_path.as_str())
-                .output().expect("file to disassemble llvm bitcode");
+                .output().expect("Fail to disassemble llvm bitcode.");
+            Command::new("sh").arg("-c").arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
+                .output().expect("Fail to generate RISC-V assembly code.");
             println!(">>> done <<<")
         }
     }

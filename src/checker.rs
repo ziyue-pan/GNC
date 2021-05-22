@@ -1,6 +1,6 @@
-use parser::{GNCAST, GNCType};
+use parser::{GNCAST};
 use std::process::exit;
-use colored::{Colorize, ColoredString};
+use colored::{Colorize};
 
 pub struct GNCError {
     pub code: i32,
