@@ -7,8 +7,9 @@ use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, C
 use inkwell::{IntPredicate};
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
-use inkwell::values::{PointerValue, IntValue, FunctionValue};
+use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue};
 use inkwell::basic_block::BasicBlock;
+use inkwell::types::{BasicTypeEnum};
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -106,17 +107,26 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
 
+    // TODO add function call
     fn gen_function(&mut self,
                     func_type: &GNCType,
                     func_name: &String,
                     func_param: &Vec<GNCParameter>,
                     func_body: &Vec<GNCAST>) {
-
-        // TODO add function parameter
         // function parameter should be added in this llvm_func_type
+        let mut param_types: Vec<BasicTypeEnum> = Vec::new();
+        for param in func_param {
+            param_types.push(BasicTypeEnum::from(
+                match param.param_type {
+                    GNCType::Void => self.context.i32_type(),
+                    GNCType::Int => self.context.i32_type(),
+                }
+            ));
+        }
+
         let llvm_func_type = match func_type {
-            GNCType::Int => { self.context.i32_type().fn_type(&[], false) }
-            _ => { self.context.i32_type().fn_type(&[], false) }
+            GNCType::Int => { self.context.i32_type().fn_type(&param_types, false) }
+            GNCType::Void => { self.context.i32_type().fn_type(&param_types, false) }
         };
 
         // push local map
@@ -130,6 +140,32 @@ impl<'ctx> CodeGen<'ctx> {
         // create function block
         let func_block = self.context.append_basic_block(func, "entry");
         self.builder.position_at_end(func_block);
+
+        // function parameter store
+        for (i, arg) in func.get_param_iter().enumerate() {
+            // get param name
+            let arg_name = &(*func_param[i].param_name);
+            // set param name
+            arg.set_name(arg_name);
+
+            let builder = self.context.create_builder();
+            let func_entry = func.get_first_basic_block().unwrap();
+
+            match func_entry.get_first_instruction() {
+                Some(first_inst) => builder.position_before(&first_inst),
+                None => builder.position_at_end(func_entry),
+            }
+
+            // alloc variable on stack
+            let alloca = builder.build_alloca(
+                match func_param[i].param_type {
+                    GNCType::Void => self.context.i32_type(),
+                    GNCType::Int => self.context.i32_type(),
+                },
+                &arg_name,
+            );
+            self.save_ptr_val(&arg_name.to_string(), alloca);
+        }
 
         // generate IR for statements inside the function body
         for statement in func_body {
@@ -202,7 +238,6 @@ impl<'ctx> CodeGen<'ctx> {
                             self.context.i32_type(), identifier);
                         self.save_ptr_val(identifier, point_value);
                     }
-                    // TODO More Types
                     _ => {
                         panic!("Invalid Type")
                     }
@@ -397,13 +432,13 @@ impl<'ctx> CodeGen<'ctx> {
         let cond_val = self.gen_expression(cond);
 
         if is_do_while {
+            // build do-while unconditional branch
+            self.builder.build_unconditional_branch(while_block);
+        } else {
             // build while conditional branch
             self.builder.build_conditional_branch(cond_val,
                                                   while_block,
                                                   after_block);
-        } else {
-            // build do-while unconditional branch
-            self.builder.build_unconditional_branch(while_block);
         }
         self.builder.position_at_end(while_block);
 
@@ -533,4 +568,11 @@ impl<'ctx> CodeGen<'ctx> {
         let terminator = block.unwrap().get_terminator();
         return terminator.is_none();
     }
+
+    // fn to_llvm_type(&self, t: GNCType) -> &BasicType<'ctx> {
+    //     match t {
+    //         GNCType::Void => self.context.i32_type(),
+    //         GNCType::Int => self.context.i32_type(),
+    //     }
+    // }
 }

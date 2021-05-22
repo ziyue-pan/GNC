@@ -18,10 +18,11 @@ pub enum GNCType {
     Int,
 }
 
+
 #[derive(Debug)]
 pub struct GNCParameter {
-    param_type: GNCType,
-    param_name: String,
+    pub param_type: GNCType,
+    pub param_name: String,
 }
 
 #[derive(Debug)]
@@ -69,6 +70,8 @@ pub enum AssignOperation {
     ShiftRight,
 }
 
+
+// TODO add function call's AST
 #[derive(Debug)]
 pub enum GNCAST {
     // Function AST: return type, name, parameter list and code block
@@ -127,15 +130,10 @@ fn visit_gnc(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
     if pair.as_rule() != Rule::gnc {
         panic!("[ERROR] cannot find start parsing rule: gnc");
     }
-
     for token in pair.into_inner() {
         match token.as_rule() {
-            Rule::function => {
-                visit_function(token, ast);
-            }
-            Rule::global_variable => {
-                visit_global_variable(token, ast)
-            }
+            Rule::function => { visit_function(token, ast); }
+            Rule::global_variable => { visit_global_variable(token, ast) }
             _ => {}
         }
     }
@@ -165,10 +163,22 @@ fn visit_function(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
 }
 
 
-// TODO add function parameter
 fn visit_function_parameter_list(pair: Pair<'_, Rule>, func_param_list: &mut Vec<GNCParameter>) {
-    match pair.as_rule() {
-        _ => {}
+    let mut pairs = pair.into_inner();
+    let mut token_pair = pairs.next();
+
+    while token_pair.is_some() {
+        let mut token = token_pair.unwrap().into_inner();
+
+        let param_type = token.next().unwrap();
+        let param_name = token.next().unwrap();
+
+        func_param_list.push(GNCParameter {
+            param_type: visit_data_type(param_type),
+            param_name: param_name.as_str().to_string(),
+        });
+
+        token_pair = pairs.next();
     }
 }
 

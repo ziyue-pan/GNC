@@ -76,7 +76,7 @@ mod tests {
             bitcode_path.pop();
             bitcode_path.push_str("bc");
 
-            println!(">>> Start compiling {} <<<", source_path.blue());
+            println!(">>> {} {} <<<", "Start compiling".green(), source_path.blue());
             let ast = parser::parse(source_path);
 
             let context = Context::create();
@@ -99,7 +99,7 @@ mod tests {
                 panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
             }
 
-            println!(">>> done <<<")
+            println!(">>> {} <<<", "Done!".green());
         }
     }
 
