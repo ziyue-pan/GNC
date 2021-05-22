@@ -1,7 +1,10 @@
-on:
+on: 
   push:
-    tags-ignore:
-      - frontend-v*
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 name: CI
 

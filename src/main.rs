@@ -84,10 +84,21 @@ mod tests {
             code_gen.gen(&ast);
 
             // generate llvm-ir code
-            Command::new("sh").arg("-c").arg("llvm-dis ".to_owned() + bitcode_path.as_str())
+            let llvm_dis_output = Command::new("sh").arg("-c").
+                arg("llvm-dis ".to_owned() + bitcode_path.as_str())
                 .output().expect("Fail to disassemble llvm bitcode.");
-            Command::new("sh").arg("-c").arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
+            if !llvm_dis_output.status.success() {
+                panic!("{}", String::from_utf8_lossy(&llvm_dis_output.stderr));
+            }
+
+            // generate riscv64 assembly
+            let gen_rv64_output = Command::new("sh").arg("-c")
+                .arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
                 .output().expect("Fail to generate RISC-V assembly code.");
+            if !gen_rv64_output.status.success() {
+                panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
+            }
+
             println!(">>> done <<<")
         }
     }

@@ -255,6 +255,15 @@ impl<'ctx> CodeGen<'ctx> {
                 let break_block = self.break_labels.back().unwrap();
                 self.builder.build_unconditional_branch(*break_block);
             }
+            GNCAST::ForStatement(ref init_clauses,
+                                 ref cond,
+                                 ref step,
+                                 ref for_statements) => {
+                self.gen_for_statement(init_clauses,
+                                       cond,
+                                       step,
+                                       for_statements);
+            }
             _ => {
                 panic!("Invalid Statement");
             }
@@ -263,6 +272,64 @@ impl<'ctx> CodeGen<'ctx> {
 
 
     //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    fn gen_for_statement(&mut self,
+                         initial_statements: &Vec<GNCAST>,
+                         cond: &Box<Option<GNCAST>>,
+                         step: &Box<Option<GNCAST>>,
+                         for_statements: &Box<GNCAST>) {
+        let func = self.current_function.unwrap();
+
+        let before_block = self.context.append_basic_block(func, "before_block");
+        let loop_block = self.context.append_basic_block(func, "for_block");
+        let step_block = self.context.append_basic_block(func, "step_block");
+        let after_block = self.context.append_basic_block(func, "after_block");
+
+        self.continue_labels.push_back(step_block);
+        self.break_labels.push_back(after_block);
+
+        // generate initial clauses
+        for init_clause in initial_statements {
+            self.gen_statement(init_clause);
+        }
+        self.builder.build_unconditional_branch(before_block);
+
+        // build before block
+        self.builder.position_at_end(before_block);
+        let cond_expr = cond.as_ref().as_ref();
+
+        // generate for condition
+        if cond_expr.is_none() {
+            self.builder.build_unconditional_branch(loop_block);
+        } else {
+            let cond_val = self.gen_expression(cond_expr.unwrap());
+            self.builder.build_conditional_branch(cond_val,
+                                                  loop_block,
+                                                  after_block);
+        }
+
+        // generate for-loop body
+        self.builder.position_at_end(loop_block);
+        self.gen_block_statements(for_statements);
+        self.builder.build_unconditional_branch(step_block);
+
+        // generate step-clause
+        self.builder.position_at_end(step_block);
+        let step_statement = step.as_ref().as_ref();
+        if step_statement.is_some() {
+            self.gen_statement(step_statement.unwrap());
+        }
+
+        if self.no_terminator() {
+            self.builder.build_unconditional_branch(before_block);
+        }
+
+        // generate after block
+        self.builder.position_at_end(after_block);
+
+        self.continue_labels.pop_back();
+        self.break_labels.pop_back();
+    }
 
 
     // generate if-else statements
@@ -288,14 +355,14 @@ impl<'ctx> CodeGen<'ctx> {
 
         // build if_block
         self.builder.position_at_end(if_block);
-        self.build_block(if_statements);
+        self.gen_block_statements(if_statements);
         if self.no_terminator() {
             self.builder.build_unconditional_branch(merge_block);
         }
 
         // build else_block
         self.builder.position_at_end(else_block);
-        self.build_block(else_statements);
+        self.gen_block_statements(else_statements);
         if self.no_terminator() {
             self.builder.build_unconditional_branch(merge_block);
         }
@@ -341,7 +408,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(while_block);
 
         // build while block
-        self.build_block(while_statements);
+        self.gen_block_statements(while_statements);
         if self.no_terminator() {
             if is_do_while {
                 let do_while_cond = self.gen_expression(cond);
@@ -450,7 +517,7 @@ impl<'ctx> CodeGen<'ctx> {
     //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
-    fn build_block(&mut self, block: &Box<GNCAST>) {
+    fn gen_block_statements(&mut self, block: &Box<GNCAST>) {
         match **block {
             GNCAST::BlockStatement(ref statements) => {
                 for statement in statements {
