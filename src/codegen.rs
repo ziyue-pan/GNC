@@ -239,11 +239,7 @@ impl<'ctx> CodeGen<'ctx> {
             GNCAST::WhileStatement(ref is_do_while,
                                    ref cond,
                                    ref while_statements) => {
-                if *is_do_while {
-                    self.gen_do_while_statements(cond, while_statements);
-                } else {
-                    self.gen_while_statements(cond, while_statements);
-                }
+                self.gen_while_statements(*is_do_while, cond, while_statements);
             }
             GNCAST::ContinueStatement => {
                 if self.continue_labels.is_empty() {
@@ -308,12 +304,16 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
 
-    // generate while statements
-    fn gen_while_statements(&mut self, cond: &Box<GNCAST>, while_statements: &Box<GNCAST>) {
+    // generate while or do-while statements
+    fn gen_while_statements(&mut self,
+                            is_do_while: bool,
+                            cond: &Box<GNCAST>,
+                            while_statements: &Box<GNCAST>) {
         let func = self.current_function.unwrap();
 
         let before_block = self.context.append_basic_block(func, "before_while");
-        let while_block = self.context.append_basic_block(func, "while");
+        let while_block = self.context.append_basic_block(func,
+                                                          if is_do_while { "do_while" } else { "while" });
         let after_block = self.context.append_basic_block(func, "after_loop");
 
         // push labels
@@ -329,16 +329,28 @@ impl<'ctx> CodeGen<'ctx> {
         self.builder.position_at_end(before_block);
         let cond_val = self.gen_expression(cond);
 
-        // build while conditional branch
-        self.builder.build_conditional_branch(cond_val,
-                                              while_block,
-                                              after_block);
+        if is_do_while {
+            // build while conditional branch
+            self.builder.build_conditional_branch(cond_val,
+                                                  while_block,
+                                                  after_block);
+        } else {
+            // build do-while unconditional branch
+            self.builder.build_unconditional_branch(while_block);
+        }
         self.builder.position_at_end(while_block);
 
         // build while block
         self.build_block(while_statements);
         if self.no_terminator() {
-            self.builder.build_unconditional_branch(before_block);
+            if is_do_while {
+                let do_while_cond = self.gen_expression(cond);
+                self.builder.build_conditional_branch(do_while_cond,
+                                                      before_block,
+                                                      after_block);
+            } else {
+                self.builder.build_unconditional_branch(before_block);
+            }
         }
 
         // position to after block
@@ -347,9 +359,6 @@ impl<'ctx> CodeGen<'ctx> {
         self.break_labels.pop_back();
         self.continue_labels.pop_back();
     }
-
-    // generate do-while statements
-    fn gen_do_while_statements(&mut self, cond: &Box<GNCAST>, while_statements: &Box<GNCAST>) {}
 
     //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
