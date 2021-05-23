@@ -7,16 +7,17 @@ extern crate colored;
 extern crate walkdir;
 
 
-use clap::{App, Arg};
+use codegen::CodeGen;
+use checker::GNCError;
 use std::process::Command;
+use clap::{App, Arg};
 use inkwell::context::Context;
+use colored::{Colorize};
 
 mod parser;
 mod codegen;
 mod checker;
 
-use codegen::CodeGen;
-use checker::GNCError;
 
 fn main() {
     let mut app = App::new("gncc")
@@ -33,19 +34,39 @@ fn main() {
         let split = split.collect::<Vec<&str>>();
 
         if split.len() == 0 || split[split.len() - 1] != "c" {
-            checker::prompt(&GNCError {
-                code: 0,
-                description: String::from("the source file extension must be `.c`!"),
-            });
+            let err = GNCError::InvalidSuffix;
+            err.prompt();
         }
 
-        let ast = parser::parse(file_path);
 
-        checker::check(&ast);
+        let mut bitcode_path = String::from(file_path);
+        bitcode_path.pop();
+        bitcode_path.push_str("bc");
+
+        println!(">>> {} {} <<<", "Start compiling".green(), file_path.blue());
+        let ast = parser::parse(file_path);
 
         let context = Context::create();
         let mut code_gen = CodeGen::new(&context, file_path);
         code_gen.gen(&ast);
+
+        // generate llvm-ir code
+        let llvm_dis_output = Command::new("sh").arg("-c").
+            arg("llvm-dis ".to_owned() + bitcode_path.as_str())
+            .output().expect("Fail to disassemble llvm bitcode.");
+        if !llvm_dis_output.status.success() {
+            panic!("{}", String::from_utf8_lossy(&llvm_dis_output.stderr));
+        }
+
+        // generate riscv64 assembly
+        let gen_rv64_output = Command::new("sh").arg("-c")
+            .arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
+            .output().expect("Fail to generate RISC-V assembly code.");
+        if !gen_rv64_output.status.success() {
+            panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
+        }
+
+        println!(">>> {} <<<", "Done!".green());
     } else {
         app.print_help().unwrap();
     }
@@ -57,7 +78,6 @@ mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
     use walkdir::WalkDir;
-    use colored::{Colorize};
 
     #[test]
     fn test_compile() {

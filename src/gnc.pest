@@ -72,10 +72,11 @@ declaration = { identifier ~ ( "=" ~ expression ) ? }
 none_for_condition = { "" }
 
 // expression
-expression = {function_call | assignment_expression | logical_or_expression }
+expression = { assignment_expression | logical_or_expression }
 
 
 unary_expression = {
+    function_call |
     "(" ~ expression ~ ")" |
     int_literal |
     identifier |
@@ -171,7 +172,3 @@ COMMENT = _{
     ("/*" ~ (!"*/" ~ ANY)* ~ "*/") // Block comment
     | ("//" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI)) // Line comment
 }
-
-
-
-

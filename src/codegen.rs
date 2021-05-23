@@ -1,7 +1,7 @@
 use inkwell::context::Context;
 use inkwell::module::Module;
 use std::path::{Path, PathBuf};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque, HashSet};
 use parser::{GNCAST, GNCType, UnaryOperator, BinaryOperator, AssignOperation, GNCParameter};
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
 use inkwell::{IntPredicate};
@@ -10,6 +10,7 @@ use inkwell::builder::Builder;
 use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue};
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicTypeEnum};
+use checker::GNCError;
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -34,6 +35,8 @@ pub struct CodeGen<'ctx> {
     break_labels: VecDeque<BasicBlock<'ctx>>,
     // continue labels (in loop statements)
     continue_labels: VecDeque<BasicBlock<'ctx>>,
+    // hashset for functions
+    function_set: HashSet<String>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -58,18 +61,34 @@ impl<'ctx> CodeGen<'ctx> {
             current_function: None,
             break_labels: VecDeque::new(),
             continue_labels: VecDeque::new(),
+            function_set: HashSet::new(),
         }
     }
 
     // generate all code
     pub fn gen(&mut self, ast: &Vec<GNCAST>) {
+        // first scan
         for node in ast {
             match node {
                 GNCAST::Function(ref func_type,
                                  ref func_name,
                                  ref func_param,
                                  ref func_body) => {
-                    self.gen_function(func_type, func_name, func_param, func_body);
+                    self.gen_function_proto(func_type, func_name, func_param);
+                }
+                _ => { panic!(); }
+            }
+        }
+
+
+        // second scan
+        for node in ast {
+            match node {
+                GNCAST::Function(ref func_type,
+                                 ref func_name,
+                                 ref func_param,
+                                 ref func_body) => {
+                    self.gen_function_def(func_type, func_name, func_param, func_body);
                 }
                 // TODO Update global hashmap: addr_map_stack[addr_map_stack.len() - 1].insert(identifier, PointerValue);
                 _ => { panic!(); }
@@ -107,12 +126,16 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
 
-    // TODO add function call
-    fn gen_function(&mut self,
-                    func_type: &GNCType,
-                    func_name: &String,
-                    func_param: &Vec<GNCParameter>,
-                    func_body: &Vec<GNCAST>) {
+    // generate function proto
+    fn gen_function_proto(&mut self,
+                          func_type: &GNCType,
+                          func_name: &String,
+                          func_param: &Vec<GNCParameter>) -> Result<(), GNCError> {
+        // cannot handle duplicate function
+        if self.function_set.contains(func_name) {
+            return Err(GNCError::DuplicateFunction);
+        }
+
         // function parameter should be added in this llvm_func_type
         let mut param_types: Vec<BasicTypeEnum> = Vec::new();
         for param in func_param {
@@ -128,13 +151,28 @@ impl<'ctx> CodeGen<'ctx> {
             GNCType::Int => { self.context.i32_type().fn_type(&param_types, false) }
             GNCType::Void => { self.context.i32_type().fn_type(&param_types, false) }
         };
+        // create function
+        self.module.add_function(func_name.as_str(), llvm_func_type, None);
+        self.function_set.insert(func_name.to_owned());
 
+        Ok(())
+    }
+
+
+    fn gen_function_def(&mut self,
+                        func_type: &GNCType,
+                        func_name: &String,
+                        func_param: &Vec<GNCParameter>,
+                        func_body: &Vec<GNCAST>) {
         // push local map
         let local_map: HashMap<String, PointerValue> = HashMap::new();
         self.addr_map_stack.push(local_map);
 
-        // create function
-        let func = self.module.add_function(func_name.as_str(), llvm_func_type, None);
+        let func_option = self.module.get_function(func_name.as_str());
+        if func_option.is_none() {
+            panic!();
+        }
+        let func = func_option.unwrap();
         self.current_function = Some(func);
 
         // create function block
@@ -198,7 +236,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
 
-    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     fn get_point_value(&self, identifier: &String) -> PointerValue {
         for map in self.addr_map_stack.iter().rev() {
@@ -242,6 +280,10 @@ impl<'ctx> CodeGen<'ctx> {
                         panic!("Invalid Type")
                     }
                 }
+            }
+            GNCAST::FunctionCall(ref function_name,
+                                 ref parameters) => {
+                self.gen_function_call(function_name, parameters);
             }
             GNCAST::Assignment(ref op,
                                ref identifier,
@@ -306,7 +348,19 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
 
-    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    fn gen_function_call(&self,
+                         function_name: &String,
+                         parameters: &Vec<GNCAST>) -> Result<(), GNCError> {
+        // TODO generate function call
+        let func = self.module.get_function(function_name);
+        if func.is_none() {
+            return Err(GNCError::MissingFunction);
+        }
+
+        Ok(())
+    }
 
     fn gen_for_statement(&mut self,
                          initial_statements: &Vec<GNCAST>,
@@ -462,7 +516,7 @@ impl<'ctx> CodeGen<'ctx> {
         self.continue_labels.pop_back();
     }
 
-    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     // generate expressions
     fn gen_expression(&self, expression: &GNCAST) -> IntValue {
@@ -549,7 +603,7 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
 
-    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
     fn gen_block_statements(&mut self, block: &Box<GNCAST>) {
@@ -569,10 +623,10 @@ impl<'ctx> CodeGen<'ctx> {
         return terminator.is_none();
     }
 
-    // fn to_llvm_type(&self, t: GNCType) -> &BasicType<'ctx> {
-    //     match t {
-    //         GNCType::Void => self.context.i32_type(),
-    //         GNCType::Int => self.context.i32_type(),
-    //     }
-    // }
+// fn to_llvm_type(&self, t: GNCType) -> &BasicType<'ctx> {
+//     match t {
+//         GNCType::Void => self.context.i32_type(),
+//         GNCType::Int => self.context.i32_type(),
+//     }
+// }
 }

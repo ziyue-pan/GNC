@@ -91,6 +91,9 @@ pub enum GNCAST {
     // Statements block: (a new scope)
     BlockStatement(Vec<GNCAST>),
 
+    // Function Call:
+    FunctionCall(String, Vec<GNCAST>),
+
     ContinueStatement,
     BreakStatement,
     ReturnStatement(Box<Option<GNCAST>>),
@@ -499,6 +502,8 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
             visit_int_literal(expr)
         } else if expr.as_rule() == Rule::identifier {
             GNCAST::Identifier(expr.as_str().to_string())
+        } else if expr.as_rule() == Rule::function_call {
+            visit_function_call(expr)
         } else {
             GNCAST::UnaryExpression(
                 match expr.as_rule() {
@@ -512,6 +517,24 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
         };
     }
     panic!("")
+}
+
+// parse function call
+fn visit_function_call(pair: Pair<'_, Rule>) -> GNCAST {
+    let mut pairs = pair.into_inner();
+
+    let function_name = pairs.next().unwrap().as_str().to_string();
+    let mut call_parameters: Vec<GNCAST> = vec![];
+
+    // iterate parameters
+    let mut expr_pair = pairs.next();
+    while expr_pair.is_some() {
+        let expr = expr_pair.unwrap();
+        call_parameters.push(visit_expression(expr));
+        expr_pair = pairs.next();
+    }
+
+    return GNCAST::FunctionCall(function_name, call_parameters);
 }
 
 

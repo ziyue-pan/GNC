@@ -1,13 +1,6 @@
-//
-//int main() {
-//    return foo(0, 1);
-//}
-
-
 int main() {
-    return 0;
+    return foo(0, 1);
 }
-
 
 int foo(int a, int b) {
     return a + b;
@@ -23,12 +16,13 @@ int bar(int a, int b, int c) {
     return rst;
 }
 
+
 //- gnc
 //  - function
 //    - data_type: "int"
 //    - identifier: "main"
 //    - function_parameter_list: "()"
-//    - statement > return_statement > expression > function_call
+//    - statement > return_statement > expression > logical_or_expression > logical_and_expression > inclusive_or_expression > exclusive_or_expression > bitwise_and_expression > equality_expression > comparison_expression > shift_expression > additive_expression > multiplicative_expression > unary_expression > function_call
 //      - identifier: "foo"
 //      - expression > logical_or_expression > logical_and_expression > inclusive_or_expression > exclusive_or_expression > bitwise_and_expression > equality_expression > comparison_expression > shift_expression > additive_expression > multiplicative_expression > unary_expression > int_literal > dec_literal: "0"
 //      - expression > logical_or_expression > logical_and_expression > inclusive_or_expression > exclusive_or_expression > bitwise_and_expression > equality_expression > comparison_expression > shift_expression > additive_expression > multiplicative_expression > unary_expression > int_literal > dec_literal: "1"
