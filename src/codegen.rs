@@ -130,10 +130,11 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_function_proto(&mut self,
                           func_type: &GNCType,
                           func_name: &String,
-                          func_param: &Vec<GNCParameter>) -> Result<(), GNCError> {
+                          func_param: &Vec<GNCParameter>) {
         // cannot handle duplicate function
         if self.function_set.contains(func_name) {
-            return Err(GNCError::DuplicateFunction);
+            GNCError::handle(&GNCError::DuplicateFunction(func_name.to_string()),
+                             None);
         }
 
         // function parameter should be added in this llvm_func_type
@@ -154,8 +155,6 @@ impl<'ctx> CodeGen<'ctx> {
         // create function
         self.module.add_function(func_name.as_str(), llvm_func_type, None);
         self.function_set.insert(func_name.to_owned());
-
-        Ok(())
     }
 
 
@@ -352,14 +351,12 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn gen_function_call(&self,
                          function_name: &String,
-                         parameters: &Vec<GNCAST>) -> Result<(), GNCError> {
+                         parameters: &Vec<GNCAST>) {
         // TODO generate function call
         let func = self.module.get_function(function_name);
         if func.is_none() {
-            return Err(GNCError::MissingFunction);
+            GNCError::handle(&GNCError::MissingFunction(function_name.to_string()), None);
         }
-
-        Ok(())
     }
 
     fn gen_for_statement(&mut self,

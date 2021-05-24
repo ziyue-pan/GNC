@@ -34,8 +34,7 @@ fn main() {
         let split = split.collect::<Vec<&str>>();
 
         if split.len() == 0 || split[split.len() - 1] != "c" {
-            let err = GNCError::InvalidSuffix;
-            err.prompt();
+            GNCError::handle(&GNCError::InvalidSuffix, None);
         }
 
 
