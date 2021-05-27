@@ -76,7 +76,7 @@ export default function AntVTree(props) {
                     fill: '#ECFDF5',
                     stroke: '#34D399',
                 },
-                label: node.id,
+                label: node.label,
                 labelCfg: {
                     position,
                     offset: 5,
