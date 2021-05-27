@@ -12,6 +12,9 @@ pub enum GNCError {
     InvalidSuffix,
     MissingFunction(String),
     DuplicateFunction(String),
+    ParameterCountMismatch(String, usize, usize),
+    ParameterMismatch(),
+    InvalidFunctionCall(),
 }
 
 impl GNCError {
@@ -23,6 +26,20 @@ impl GNCError {
             }
             GNCError::DuplicateFunction(ref function_name) => {
                 format!("duplicate function: {}", function_name.as_str().yellow())
+            }
+            GNCError::ParameterCountMismatch(ref function_name,
+                                             ref required_size,
+                                             ref given_size) => {
+                format!("parameter counts mismatch when calling `{}`, requires {}, found {}",
+                        function_name.as_str().yellow(),
+                        required_size.to_string().as_str().yellow(),
+                        required_size.to_string().as_str().yellow())
+            }
+            GNCError::ParameterMismatch() => {
+                "".to_string()
+            }
+            GNCError::InvalidFunctionCall() => {
+                "".to_string()
             }
         }
     }

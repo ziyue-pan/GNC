@@ -7,7 +7,7 @@ use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, C
 use inkwell::{IntPredicate};
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
-use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue};
+use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue, BasicValueEnum};
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicTypeEnum};
 use checker::GNCError;
@@ -351,12 +351,44 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn gen_function_call(&self,
                          function_name: &String,
-                         parameters: &Vec<GNCAST>) {
-        // TODO generate function call
-        let func = self.module.get_function(function_name);
-        if func.is_none() {
-            GNCError::handle(&GNCError::MissingFunction(function_name.to_string()), None);
+                         parameters: &Vec<GNCAST>) -> IntValue {
+        let func_option = self.module.get_function(function_name);
+        if func_option.is_none() {
+            GNCError::handle(&GNCError::MissingFunction(
+                function_name.to_string()), None);
         }
+
+        let func = func_option.unwrap();
+        let func_param_count = func.get_type().count_param_types();
+
+        // handle calling parameter count mismatch
+        if parameters.len() != func_param_count as usize {
+            GNCError::handle(&GNCError::ParameterCountMismatch(
+                function_name.to_string(),
+                func_param_count as usize,
+                parameters.len(),
+            ), None);
+        }
+
+        let mut compiled_args: Vec<BasicValueEnum> =
+            Vec::with_capacity(parameters.len());
+
+
+        for arg in parameters {
+            compiled_args.push(BasicValueEnum::from(
+                self.gen_expression(arg)));
+        }
+
+        let value = self.builder.build_call(func_option.unwrap(),
+                                            compiled_args.as_slice(),
+                                            "").try_as_basic_value().left();
+
+        if value.is_some() {
+            return value.unwrap().into_int_value();
+        }
+
+        GNCError::handle(&GNCError::InvalidFunctionCall(), None);
+        panic!()
     }
 
     fn gen_for_statement(&mut self,
@@ -530,6 +562,9 @@ impl<'ctx> CodeGen<'ctx> {
             GNCAST::BinaryExpression(ref op, ref lhs, ref rhs) => {
                 self.gen_binary_expression(op, lhs, rhs)
             }
+            GNCAST::FunctionCall(ref function_name, ref parameters) => {
+                self.gen_function_call(function_name, parameters)
+            }
             _ => { panic!("Invalid Expression Type") }
         }
     }
@@ -604,6 +639,9 @@ impl<'ctx> CodeGen<'ctx> {
 
 
     fn gen_block_statements(&mut self, block: &Box<GNCAST>) {
+        let local_map: HashMap<String, PointerValue> = HashMap::new();
+        self.addr_map_stack.push(local_map);
+
         match **block {
             GNCAST::BlockStatement(ref statements) => {
                 for statement in statements {
@@ -612,6 +650,8 @@ impl<'ctx> CodeGen<'ctx> {
             }
             _ => { panic!() }
         }
+
+        self.addr_map_stack.pop();
     }
 
     fn no_terminator(&self) -> bool {

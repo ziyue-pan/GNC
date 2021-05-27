@@ -14,24 +14,16 @@
 - [x] binary operation
 - [x] conditional statement
 - [x] loop statement
-- [ ] scope 
-- [ ] function
+- [x] scope 
+- [x] function
 - [ ] global variable
 - [ ] array
 - [ ] pointer
-
-
-## Advanced Steps
-
+- [ ] more types
+- [ ] string
 - [ ] struct
 - [ ] struct with function
 
-
-## Development
-
-- [ ] unit test for a single grammar feature
-- [ ] integrated test for combinations of grammar features
-- [ ] functional test for small programs
 
 
 ## Reference

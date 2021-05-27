@@ -1,4 +1,8 @@
+//int a;
+
+
 int main() {
+
     return foo(0, 1);
 }
 
