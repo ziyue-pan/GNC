@@ -4,7 +4,7 @@ use serde::{Serialize};
 
 #[derive(Parser, Serialize)]
 #[grammar = "./gnc.pest"]
-pub(crate) struct GNCParser;
+pub struct GNCParser;
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

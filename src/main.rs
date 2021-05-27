@@ -25,9 +25,9 @@ mod parser;
 mod checker;
 
 fn parse_file(file_path: &str) {
-    let mut bitcode_path = String::from(file_path);
-    bitcode_path.pop();
-    bitcode_path.push_str("bc");
+    // let mut bitcode_path = String::from(file_path);
+    // bitcode_path.pop();
+    // bitcode_path.push_str("bc");
 
     println!(">>> {} {} <<<", "Start compiling".green(), file_path.blue());
     let mut source_file: File = File::open(file_path).expect("Unable to open source file!");
@@ -40,6 +40,26 @@ fn parse_file(file_path: &str) {
     let ast = parser::parse(gnc_pair);
     let serialized_ast = serde_json::to_string(&ast).unwrap();
     println!("serialized = {}", serialized_ast);
+
+    // let context = Context::create();
+    // let mut code_gen = CodeGen::new(&context, file_path);
+    // code_gen.gen(&ast);
+
+    // // generate llvm-ir code
+    // let llvm_dis_output = Command::new("sh").arg("-c").
+    //     arg("llvm-dis ".to_owned() + bitcode_path.as_str())
+    //     .output().expect("Fail to disassemble llvm bitcode.");
+    // if !llvm_dis_output.status.success() {
+    //     panic!("{}", String::from_utf8_lossy(&llvm_dis_output.stderr));
+    // }
+    //
+    // // generate riscv64 assembly
+    // let gen_rv64_output = Command::new("sh").arg("-c")
+    //     .arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
+    //     .output().expect("Fail to generate RISC-V assembly code.");
+    // if !gen_rv64_output.status.success() {
+    //     panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
+    // }
 }
 
 
@@ -62,26 +82,6 @@ fn main() {
         }
 
         parse_file(file_path);
-
-        // let context = Context::create();
-        // let mut code_gen = CodeGen::new(&context, file_path);
-        // code_gen.gen(&ast);
-
-        // // generate llvm-ir code
-        // let llvm_dis_output = Command::new("sh").arg("-c").
-        //     arg("llvm-dis ".to_owned() + bitcode_path.as_str())
-        //     .output().expect("Fail to disassemble llvm bitcode.");
-        // if !llvm_dis_output.status.success() {
-        //     panic!("{}", String::from_utf8_lossy(&llvm_dis_output.stderr));
-        // }
-        //
-        // // generate riscv64 assembly
-        // let gen_rv64_output = Command::new("sh").arg("-c")
-        //     .arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
-        //     .output().expect("Fail to generate RISC-V assembly code.");
-        // if !gen_rv64_output.status.success() {
-        //     panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
-        // }
 
         println!(">>> {} <<<", "Done!".green());
     } else {
@@ -111,26 +111,6 @@ mod tests {
             if !source_path.ends_with(".c") { continue; }
 
             parse_file(source_path);
-
-            // let context = Context::create();
-            // let mut code_gen = CodeGen::new(&context, source_path);
-            // code_gen.gen(&ast);
-
-            // // generate llvm-ir code
-            // let llvm_dis_output = Command::new("sh").arg("-c").
-            //     arg("llvm-dis ".to_owned() + bitcode_path.as_str())
-            //     .output().expect("Fail to disassemble llvm bitcode.");
-            // if !llvm_dis_output.status.success() {
-            //     panic!("{}", String::from_utf8_lossy(&llvm_dis_output.stderr));
-            // }
-            //
-            // // generate riscv64 assembly
-            // let gen_rv64_output = Command::new("sh").arg("-c")
-            //     .arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
-            //     .output().expect("Fail to generate RISC-V assembly code.");
-            // if !gen_rv64_output.status.success() {
-            //     panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
-            // }
 
             println!(">>> {} <<<", "Done!".green());
         }
