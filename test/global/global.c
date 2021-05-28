@@ -1,22 +1,11 @@
-//int a = 0;
-
-
-int foo(int a, int b) {
-    return a + b;
-}
-
 int main() {
-    return foo(0, 1);
+    a = 3;
+    return a;
 }
 
 
+int a  = 0;
 
-int bar(int a, int b, int c) {
-    int rst = 0;
-    while (a < b) {
-        rst <<= c;
-        a += 1;
-    }
-    return rst;
+int foo() {
+    return 0;
 }
-

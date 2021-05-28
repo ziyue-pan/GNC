@@ -16,7 +16,7 @@
 - [x] loop statement
 - [x] scope 
 - [x] function
-- [ ] global variable
+- [x] global variable
 - [ ] array
 - [ ] pointer
 - [ ] more types

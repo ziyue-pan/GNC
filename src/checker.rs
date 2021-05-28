@@ -1,6 +1,7 @@
 use colored::{Colorize};
 use std::process;
 use pest::Span;
+use parser::GNCType;
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 //          GNCError
@@ -8,43 +9,57 @@ use pest::Span;
 // errors when GNC executing.
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-pub enum GNCError {
+pub enum GNCErr {
     InvalidSuffix,
     MissingFunction(String),
+    MissingVariable(String),
     DuplicateFunction(String),
+    DuplicateGlobalVar(String),
+    InvalidType(GNCType),
     ParameterCountMismatch(String, usize, usize),
+
+    // TODO add more info in parameter mismatch
     ParameterMismatch(),
     InvalidFunctionCall(),
 }
 
-impl GNCError {
+impl GNCErr {
     pub fn msg(&self) -> String {
         match self {
-            GNCError::InvalidSuffix => "the source file extension must be `.c`!".to_string(),
-            GNCError::MissingFunction(ref function_name) => {
+            GNCErr::InvalidSuffix => "the source file extension must be `.c`!".to_string(),
+            GNCErr::MissingFunction(ref function_name) => {
                 format!("cannot find function: {}", function_name.as_str().yellow())
             }
-            GNCError::DuplicateFunction(ref function_name) => {
+            GNCErr::DuplicateFunction(ref function_name) => {
                 format!("duplicate function: {}", function_name.as_str().yellow())
             }
-            GNCError::ParameterCountMismatch(ref function_name,
-                                             ref required_size,
-                                             ref given_size) => {
+            GNCErr::ParameterCountMismatch(ref function_name,
+                                           ref required_size,
+                                           ref given_size) => {
                 format!("parameter counts mismatch when calling `{}`, requires {}, found {}",
                         function_name.as_str().yellow(),
                         required_size.to_string().as_str().yellow(),
-                        required_size.to_string().as_str().yellow())
+                        given_size.to_string().as_str().yellow())
             }
-            GNCError::ParameterMismatch() => {
-                "".to_string()
+            GNCErr::ParameterMismatch() => {
+                "Parameter Mismatch".to_string()
             }
-            GNCError::InvalidFunctionCall() => {
-                "".to_string()
+            GNCErr::InvalidFunctionCall() => {
+                "Invalid Function Call".to_string()
+            }
+            GNCErr::DuplicateGlobalVar(_) => {
+                "Duplicate Global Variable".to_string()
+            }
+            GNCErr::MissingVariable(_) => {
+                "Missing Variable".to_string()
+            }
+            GNCErr::InvalidType(ty) => {
+                ty.to_string()
             }
         }
     }
 
-    pub fn handle(err: &GNCError, span: Option<&Span<'_>>) {
+    pub fn handle(err: &GNCErr, span: Option<&Span<'_>>) {
         println!("{} {}", "[ERROR]".red().bold(), err.msg());
 
         if span.is_some() {

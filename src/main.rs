@@ -8,7 +8,7 @@ extern crate walkdir;
 
 
 use codegen::CodeGen;
-use checker::GNCError;
+use checker::GNCErr;
 use std::process::Command;
 use clap::{App, Arg};
 use inkwell::context::Context;
@@ -34,7 +34,7 @@ fn main() {
         let split = split.collect::<Vec<&str>>();
 
         if split.len() == 0 || split[split.len() - 1] != "c" {
-            GNCError::handle(&GNCError::InvalidSuffix, None);
+            GNCErr::handle(&GNCErr::InvalidSuffix, None);
         }
 
 
