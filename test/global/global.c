@@ -1,14 +1,14 @@
-//int a;
+//int a = 0;
 
-
-int main() {
-
-    return foo(0, 1);
-}
 
 int foo(int a, int b) {
     return a + b;
 }
+
+int main() {
+    return foo(0, 1);
+}
+
 
 
 int bar(int a, int b, int c) {

@@ -11,7 +11,10 @@ gnc = {
 //>>>>>>>>>>>>>>>>>>>>>>
 //  GLOBAL VARIABLES
 //<<<<<<<<<<<<<<<<<<<<<<
-global_variable = { declaration_statement ~ ";" }
+global_variable = { data_type ~
+    (identifier ~ ("=" ~ expression)?) ~
+    ("," ~ (identifier ~ ("=" ~ expression)?))* ~ ";"
+}
 
 //>>>>>>>>>>>>>>>>>>>
 //      FUNCTIONS
@@ -45,10 +48,10 @@ statement = {
 
 // declaration statement
 declaration_statement = {
-    data_type ~ declaration ~ ("," ~ declaration)*     // declaration
+    data_type ~ (identifier ~ ("=" ~ expression)?) ~
+    ("," ~ (identifier ~ ("=" ~ expression)?))*     // declaration
 }
 
-// assignment_statement = { identifier ~ "=" ~ expression ~ ( "," ~ identifier ~ "=" ~ expression )* }
 return_statement = { "return" ~ expression? }
 if_statement = { "if" ~ "(" ~ expression ~ ")" ~ statement ~ ("else" ~ statement)? }
 while_statement = { "while" ~ "(" ~ expression? ~ ")" ~ statement }
