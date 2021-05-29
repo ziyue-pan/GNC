@@ -17,9 +17,9 @@
 - [x] scope 
 - [x] function
 - [x] global variable
+- [ ] more types
 - [ ] array
 - [ ] pointer
-- [ ] more types
 - [ ] string
 - [ ] struct
 - [ ] struct with function

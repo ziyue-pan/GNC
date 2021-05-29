@@ -23,7 +23,7 @@ fn main() {
     let mut app = App::new("gncc")
         .version("0.1.0")
         .author("iamNCJ ~ MartinNose ~ Ziyue")
-        .about("gnc is going to fuck c-lang")
+        .about("gnc is going to beat c-lang")
         .arg(Arg::with_name("version").short("v").long("version").help("Show version of gncc"))
         .arg(Arg::with_name("FILE").short("c").help("File ready to be compiled").index(1));
 

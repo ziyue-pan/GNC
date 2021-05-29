@@ -80,9 +80,11 @@ expression = { assignment_expression | logical_or_expression }
 
 
 unary_expression = {
-    function_call |
-    "(" ~ expression ~ ")" |
+    float_literal |
+    bool_literal |
     int_literal |
+    bracket_expression |
+    function_call |
     identifier |
     op_arithmetic_not ~ unary_expression |
     op_logical_not ~ unary_expression |
@@ -102,6 +104,10 @@ logical_or_expression = { logical_and_expression ~ (op_logical_or ~ logical_and_
 assignment_expression = { identifier ~ (assign_simple | assign_div | assign_mul | assign_mod |
     assign_add | assign_sub | assign_shift_left | assign_shift_right | assign_bitwise_and |
     assign_exclusive_or | assign_inclusive_or) ~ expression
+}
+
+bracket_expression = {
+    "(" ~ expression ~ ")"
 }
 
 // function call
@@ -144,7 +150,6 @@ op_logical_and = { "&&" }
 op_logical_or = { "||" }
 
 
-
 assign_simple = { "=" }
 assign_div = { "/=" }
 assign_mul = { "*=" }
@@ -158,21 +163,91 @@ assign_exclusive_or = { "^=" }
 assign_inclusive_or = { "|=" }
 
 
-keyword = {"int" | "void" | "return" | "break" | "if" | "else" | "continue" | "while" | "for" | "do"}
+
 possible_identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 identifier = @{ !keyword ~ possible_identifier }
 
-data_type = { "int" }
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+data_type = {
+    bool |
+    byte |
+    unsigned_byte |
+    short |
+    unsigned_short |
+    int |
+    unsigned_int |
+    long |
+    unsigned_long |
+    float |
+    double |
+    char |
+    void
+}
+
+
+// basic types
+bool = { "bool" }
+char = { "char" }
+byte = { "byte" }
+unsigned_byte = { "unsigned" ~ "byte" }
+short = { "short" }
+unsigned_short = { "unsigned" ~ "short" }
+int = { "int" }
+unsigned_int = { "unsigned" ~ "int" }
+long = { "long" }
+unsigned_long = { "unsigned_long" }
+
+// float
+float = { "float" }
+double = { "double" }
+
+// void
+void = { "void" }
+
+
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 // literal
-int_literal = { dec_literal | hex_literal | oct_literal }
+int_literal = { bin_literal | hex_literal | oct_literal | dec_literal }
+bool_literal = @{ "true" | "false" }
 dec_literal = @{ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
-hex_literal = @{ ^"0x" ~ ASCII_ALPHANUMERIC+ }
-oct_literal = @{ "0" ~ ASCII_ALPHANUMERIC+ }
+bin_literal = @{ ^"0b" ~ ASCII_BIN_DIGIT+ }
+oct_literal = @{ ^"0o" ~ ASCII_OCT_DIGIT+ }
+hex_literal = @{ ^"0x" ~ ASCII_HEX_DIGIT+ }
+float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+
 
 WHITESPACE = _{ " " | "\n" | "\r" }
 COMMENT = _{
     ("/*" ~ (!"*/" ~ ANY)* ~ "*/") // Block comment
     | ("//" ~ (!"\n" ~ ANY)* ~ ("\n" | EOI)) // Line comment
+}
+
+//>>>>>>>>>>>>>>>>>>>>
+//      keywords
+//<<<<<<<<<<<<<<<<<<<<
+
+
+keyword = {
+    "char" |
+    "bool" |
+    "true" |
+    "false" |
+    "byte" |
+    "short" |
+    "double" |
+    "float" |
+    "long" |
+    "unsigned" |
+    "int" |
+    "void" |
+    "return" |
+    "break" |
+    "if" |
+    "else" |
+    "continue" |
+    "while" |
+    "for" |
+    "do"
 }

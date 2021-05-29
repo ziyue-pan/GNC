@@ -9,7 +9,7 @@ use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
 use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue, BasicValueEnum};
 use inkwell::basic_block::BasicBlock;
-use inkwell::types::{BasicTypeEnum, BasicType};
+use inkwell::types::{BasicTypeEnum, BasicType, FunctionType};
 use checker::GNCErr;
 
 
@@ -107,7 +107,8 @@ impl<'ctx> CodeGen<'ctx> {
         self.module.write_bitcode_to_path(llvm_bitcode_path.as_path());
 
         // set llvm target
-        Target::initialize_native(&InitializationConfig::default()).expect("Failed to initialize native target");
+        Target::initialize_native(&InitializationConfig::default())
+            .expect("Failed to initialize native target");
 
         let triple = TargetMachine::get_default_triple();
         let cpu = TargetMachine::get_host_cpu_name().to_string();
@@ -128,7 +129,9 @@ impl<'ctx> CodeGen<'ctx> {
         // write assembly code
         let mut target_assembly_path = PathBuf::from(self.source_path);
         target_assembly_path.set_extension("asm");
-        machine.write_to_file(&self.module, FileType::Assembly, target_assembly_path.as_ref()).unwrap();
+        machine.write_to_file(&self.module,
+                              FileType::Assembly,
+                              target_assembly_path.as_ref()).unwrap();
     }
 
 
@@ -173,18 +176,11 @@ impl<'ctx> CodeGen<'ctx> {
         // function parameter should be added in this llvm_func_type
         let mut param_types: Vec<BasicTypeEnum> = Vec::new();
         for param in func_param {
-            param_types.push(BasicTypeEnum::from(
-                match param.param_type {
-                    GNCType::Void => self.context.i32_type(),
-                    GNCType::Int => self.context.i32_type(),
-                }
-            ));
+            param_types.push(self.to_basic_type(&param.param_type));
         }
 
-        let llvm_func_type = match func_type {
-            GNCType::Int => { self.context.i32_type().fn_type(&param_types, false) }
-            GNCType::Void => { self.context.i32_type().fn_type(&param_types, false) }
-        };
+        let llvm_func_type = self.to_return_type(func_type, &param_types);
+
         // create function
         self.module.add_function(func_name.as_str(), llvm_func_type, None);
         self.function_set.insert(func_name.to_owned());
@@ -228,10 +224,7 @@ impl<'ctx> CodeGen<'ctx> {
 
             // alloc variable on stack
             let alloca = builder.build_alloca(
-                match func_param[i].param_type {
-                    GNCType::Void => self.context.i32_type(),
-                    GNCType::Int => self.context.i32_type(),
-                },
+                self.to_basic_type(&func_param[i].param_type),
                 &arg_name,
             );
             self.save_ptr_val(&arg_name.to_string(), alloca);
@@ -309,16 +302,10 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             GNCAST::Declaration(ref data_type, ref identifier) => {
-                match data_type {
-                    GNCType::Int => {
-                        let point_value = self.builder.build_alloca(
-                            self.context.i32_type(), identifier);
-                        self.save_ptr_val(identifier, point_value);
-                    }
-                    _ => {
-                        panic!("Invalid Type")
-                    }
-                }
+                let point_value = self.builder.build_alloca(
+                    self.to_basic_type(data_type),
+                    identifier);
+                self.save_ptr_val(identifier, point_value);
             }
             GNCAST::FunctionCall(ref function_name,
                                  ref parameters) => {
@@ -446,10 +433,14 @@ impl<'ctx> CodeGen<'ctx> {
                          for_statements: &Box<GNCAST>) {
         let func = self.current_function.unwrap();
 
-        let before_block = self.context.append_basic_block(func, "before_block");
-        let loop_block = self.context.append_basic_block(func, "for_block");
-        let step_block = self.context.append_basic_block(func, "step_block");
-        let after_block = self.context.append_basic_block(func, "after_block");
+        let before_block = self.context.append_basic_block(func,
+                                                           "before_block");
+        let loop_block = self.context.append_basic_block(func,
+                                                         "for_block");
+        let step_block = self.context.append_basic_block(func,
+                                                         "step_block");
+        let after_block = self.context.append_basic_block(func,
+                                                          "after_block");
 
         self.continue_labels.push_back(step_block);
         self.break_labels.push_back(after_block);
@@ -517,7 +508,8 @@ impl<'ctx> CodeGen<'ctx> {
                                                           "merge_block");
 
         // build condition statement
-        self.builder.build_conditional_branch(cond_val, if_block, else_block);
+        self.builder.build_conditional_branch(cond_val, if_block,
+                                              else_block);
 
         // build if_block
         self.builder.position_at_end(if_block);
@@ -544,10 +536,14 @@ impl<'ctx> CodeGen<'ctx> {
                             while_statements: &Box<GNCAST>) {
         let func = self.current_function.unwrap();
 
-        let before_block = self.context.append_basic_block(func, "before_while");
-        let while_block = self.context.append_basic_block(func,
-                                                          if is_do_while { "do_while" } else { "while" });
-        let after_block = self.context.append_basic_block(func, "after_loop");
+        let before_block =
+            self.context.append_basic_block(func, "before_while");
+        let while_block =
+            self.context.append_basic_block(func,
+                                            if is_do_while { "do_while" } else { "while" });
+        let after_block =
+            self.context.append_basic_block(func,
+                                            "after_loop");
 
         // push labels
         // linking to the blocks
@@ -602,15 +598,19 @@ impl<'ctx> CodeGen<'ctx> {
                 self.gen_identifier(identifier)
             }
             GNCAST::IntLiteral(ref int_literal) => {
-                return self.context.i32_type().const_int(*int_literal as u64, true);
+                return self.context.i32_type().const_int(*int_literal as u64,
+                                                         true);
             }
             GNCAST::UnaryExpression(ref op, ref expr) => {
                 self.gen_unary_expression(op, expr)
             }
-            GNCAST::BinaryExpression(ref op, ref lhs, ref rhs) => {
+            GNCAST::BinaryExpression(ref op,
+                                     ref lhs,
+                                     ref rhs) => {
                 self.gen_binary_expression(op, lhs, rhs)
             }
-            GNCAST::FunctionCall(ref function_name, ref parameters) => {
+            GNCAST::FunctionCall(ref function_name,
+                                 ref parameters) => {
                 self.gen_function_call(function_name, parameters)
             }
             _ => { panic!("Invalid Expression Type") }
@@ -620,7 +620,8 @@ impl<'ctx> CodeGen<'ctx> {
 
     // generate identifier and fetch value
     fn gen_identifier(&self, identifier: &String) -> IntValue {
-        return self.builder.build_load(self.get_point_value(identifier), "load_val").into_int_value();
+        return self.builder.build_load(self.get_point_value(identifier), "load_val")
+            .into_int_value();
     }
 
 
@@ -628,7 +629,8 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_unary_expression(&self, op: &UnaryOperator, expr: &Box<GNCAST>) -> IntValue {
         return match op {
             UnaryOperator::UnaryMinus => {
-                self.builder.build_int_neg(self.gen_expression(&*expr), "building neg")
+                self.builder.build_int_neg(self.gen_expression(&*expr),
+                                           "building neg")
             }
             UnaryOperator::LogicalNot => {
                 let res = self.builder.build_int_compare(
@@ -636,7 +638,9 @@ impl<'ctx> CodeGen<'ctx> {
                     self.context.i32_type().const_int(0 as u64, true),
                     self.gen_expression(&*expr), "build logical not");
 
-                let res = self.builder.build_int_cast(res, self.context.i32_type(), "logical not casting");
+                let res = self.builder.build_int_cast(res,
+                                                      self.context.i32_type(),
+                                                      "logical not casting");
                 let res = self.builder.build_int_sub(self.context.i32_type().const_int(0 as u64, true), res, "logical not");
                 res
             }
@@ -710,11 +714,32 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn to_basic_type(&self, in_type: &GNCType) -> BasicTypeEnum<'ctx> {
         match in_type {
+            GNCType::Bool => self.context.bool_type().as_basic_type_enum(),
+            GNCType::Byte => self.context.i8_type().as_basic_type_enum(),
+            GNCType::UnsignedByte => self.context.i8_type().as_basic_type_enum(),
+            GNCType::Short => self.context.i16_type().as_basic_type_enum(),
+            GNCType::UnsignedShort => self.context.i16_type().as_basic_type_enum(),
             GNCType::Int => self.context.i32_type().as_basic_type_enum(),
+            GNCType::UnsignedInt => self.context.i32_type().as_basic_type_enum(),
+            GNCType::Long => self.context.i64_type().as_basic_type_enum(),
+            GNCType::UnsignedLong => self.context.i64_type().as_basic_type_enum(),
+            GNCType::Float => self.context.f32_type().as_basic_type_enum(),
+            GNCType::Double => self.context.f64_type().as_basic_type_enum(),
             _ => {
                 GNCErr::handle(&GNCErr::InvalidType(*in_type), None);
                 panic!()
             }
+        }
+    }
+
+
+    // add void type as return type
+    fn to_return_type(&self,
+                      in_type: &GNCType,
+                      param_types: &Vec<BasicTypeEnum<'ctx>>) -> FunctionType<'ctx> {
+        match in_type {
+            GNCType::Void => self.context.void_type().fn_type(param_types, false),
+            _ => self.to_basic_type(in_type).fn_type(param_types, false),
         }
     }
 }

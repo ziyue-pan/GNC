@@ -3,6 +3,7 @@ use pest::iterators::{Pair};
 use std::fs::{File};
 use std::io::Read;
 use std::fmt;
+use std::num::ParseFloatError;
 
 
 #[derive(Parser)]
@@ -16,7 +17,17 @@ struct GNCParser;
 #[derive(Clone, Copy, Debug)]
 pub enum GNCType {
     Void,
+    Bool,
+    Byte,
+    UnsignedByte,
+    Short,
+    UnsignedShort,
     Int,
+    UnsignedInt,
+    Long,
+    UnsignedLong,
+    Float,
+    Double,
 }
 
 impl fmt::Display for GNCType {
@@ -108,7 +119,12 @@ pub enum GNCAST {
     ReturnStatement(Box<Option<GNCAST>>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
     BinaryExpression(BinaryOperator, Box<GNCAST>, Box<GNCAST>),
-    IntLiteral(i32),
+
+    // Literals
+    BoolLiteral(bool),
+    IntLiteral(i64),
+    FloatLiteral(f64),
+
     Identifier(String),
     Declaration(GNCType, String),
     Assignment(AssignOperation, String, Box<GNCAST>),
@@ -160,6 +176,7 @@ fn visit_function(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
     let mut func_identifier: String = String::new();
     let mut func_parameter: Vec<GNCParameter> = vec![];
     let mut func_statements: Vec<GNCAST> = vec![];
+
 
     for token in pair.into_inner() {
         match token.as_rule() {
@@ -543,28 +560,29 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
 
     if pair.is_some() {
         let expr = pair.unwrap();
-        return if expr.as_str() == "(" {
-            visit_expression(pairs.next().unwrap())
-        } else if expr.as_rule() == Rule::int_literal {
-            visit_int_literal(expr)
-        } else if expr.as_rule() == Rule::identifier {
-            GNCAST::Identifier(expr.as_str().to_string())
-        } else if expr.as_rule() == Rule::function_call {
-            visit_function_call(expr)
-        } else {
-            GNCAST::UnaryExpression(
-                match expr.as_rule() {
-                    Rule::op_arithmetic_not => UnaryOperator::UnaryMinus,
-                    Rule::op_logical_not => UnaryOperator::LogicalNot,
-                    Rule::op_bitwise_not => UnaryOperator::BitwiseComplement,
-                    _ => { panic!() }
-                },
-                Box::new(visit_expression(pairs.next().unwrap())),
-            )
+
+        return match expr.as_rule() {
+            Rule::bool_literal => visit_bool_literal(expr),
+            Rule::float_literal => visit_float_literal(expr),
+            Rule::int_literal => visit_int_literal(expr),
+            Rule::bracket_expression => visit_expression(expr.into_inner().next().unwrap()),
+            Rule::function_call => visit_function_call(expr),
+            Rule::identifier => GNCAST::Identifier(expr.as_str().to_string()),
+            _ =>
+                GNCAST::UnaryExpression(
+                    match expr.as_rule() {
+                        Rule::op_arithmetic_not => UnaryOperator::UnaryMinus,
+                        Rule::op_logical_not => UnaryOperator::LogicalNot,
+                        Rule::op_bitwise_not => UnaryOperator::BitwiseComplement,
+                        _ => { panic!() }
+                    },
+                    Box::new(visit_expression(pairs.next().unwrap())),
+                )
         };
     }
     panic!("")
 }
+
 
 // parse function call
 fn visit_function_call(pair: Pair<'_, Rule>) -> GNCAST {
@@ -589,19 +607,74 @@ fn visit_function_call(pair: Pair<'_, Rule>) -> GNCAST {
 //      tokens
 //<<<<<<<<<<<<<<<<<<<<<
 fn visit_data_type(pair: Pair<'_, Rule>) -> GNCType {
-    match pair.as_str() {
-        "int" => { GNCType::Int }
-        "void" => { GNCType::Void }
-        _ => { panic!("[ERROR] unexpected token while parsing the data type: {}", pair.as_str()); }
+    let token = pair.into_inner().next().unwrap();
+
+    match token.as_rule() {
+        Rule::bool => GNCType::Bool,
+        Rule::byte => GNCType::Byte,
+        Rule::unsigned_byte => GNCType::UnsignedByte,
+        Rule::short => GNCType::Short,
+        Rule::unsigned_short => GNCType::UnsignedShort,
+        Rule::int => GNCType::Int,
+        Rule::unsigned_int => GNCType::UnsignedInt,
+        Rule::long => GNCType::Long,
+        Rule::unsigned_long => GNCType::UnsignedLong,
+        Rule::float => GNCType::Float,
+        Rule::double => GNCType::Double,
+        Rule::void => GNCType::Void,
+        _ => { panic!("[ERROR] unexpected data type: {}", token.as_str()); }
     }
 }
 
+// TODO add more literal
 
+//>>>>>>>>>>>>>>>>>>
+//      literals
+//<<<<<<<<<<<<<<<<<<
+
+// int literal
 fn visit_int_literal(pair: Pair<'_, Rule>) -> GNCAST {
-    let literal = pair.into_inner().next().unwrap();
-    match literal.as_rule() {
-        Rule::dec_literal => GNCAST::IntLiteral(literal.as_str().to_string().parse::<i32>().unwrap()),
-        _ => panic!("Unsupported int literal.")
+    let literal_rule = pair.into_inner().next().unwrap();
+
+//    println!("{}", literal_rule.as_str());
+
+    match literal_rule.as_rule() {
+        Rule::bin_literal => {
+            let literal_str = literal_rule.as_str();
+            let literal = i64::from_str_radix(&literal_str[2..literal_str.len()],
+                                              2).unwrap();
+            return GNCAST::IntLiteral(literal);
+        }
+        Rule::oct_literal => {
+            let literal_str = literal_rule.as_str();
+            let literal = i64::from_str_radix(&literal_str[2..literal_str.len()],
+                                              8).unwrap();
+            return GNCAST::IntLiteral(literal);
+        }
+        Rule::dec_literal |
+        Rule::hex_literal => {
+            let literal = literal_rule.as_str().to_string().parse::<i64>().unwrap();
+            return GNCAST::IntLiteral(literal);
+        }
+        _ => { panic!("cannot parse int literal") }
+    }
+}
+
+// bool literal
+fn visit_bool_literal(pair: Pair<'_, Rule>) -> GNCAST {
+    match pair.as_str() {
+        "true" => GNCAST::BoolLiteral(true),
+        _ => GNCAST::BoolLiteral(false),
+    }
+}
+
+// float literal
+fn visit_float_literal(pair: Pair<'_, Rule>) -> GNCAST {
+    let literal_rst = pair.as_str().to_string().parse::<f64>();
+
+    match literal_rst {
+        Ok(literal) => GNCAST::FloatLiteral(literal),
+        Err(_) => { panic!("cannot parse float literal") }
     }
 }
 
