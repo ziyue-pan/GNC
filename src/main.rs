@@ -1,22 +1,65 @@
 extern crate clap;
+extern crate inkwell;
+extern crate colored;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
-extern crate inkwell;
-extern crate colored;
+extern crate serde;
 extern crate walkdir;
 
 
 use codegen::CodeGen;
 use checker::GNCErr;
 use std::process::Command;
+use std::fs::File;
+use std::io::Read;
+use pest::Parser;
+
 use clap::{App, Arg};
 use inkwell::context::Context;
-use colored::{Colorize};
+use colored::Colorize;
 
 mod parser;
 mod codegen;
 mod checker;
+
+fn parse_file(file_path: &str) {
+    let mut bitcode_path = String::from(file_path);
+    bitcode_path.pop();
+    bitcode_path.push_str("bc");
+
+    println!(">>> {} {} <<<", "Start compiling".green(), file_path.blue());
+    let mut source_file: File = File::open(file_path).expect("Unable to open source file!");
+    let mut source_content: String = String::new();
+    source_file.read_to_string(&mut source_content).expect("Unable to read the file!");
+
+    let mut pairs = parser::GNCParser::parse(parser::Rule::gnc, &source_content).unwrap_or_else(|e| panic!("{}", e));
+    let gnc_pair = pairs.next().unwrap();
+
+    let ast = parser::parse(gnc_pair);
+    let serialized_ast = serde_json::to_string(&ast).unwrap();
+    println!("serialized = {}", serialized_ast);
+
+    let context = Context::create();
+    let mut code_gen = CodeGen::new(&context, file_path);
+    code_gen.gen(&ast);
+
+    // generate llvm-ir code
+    let llvm_dis_output = Command::new("sh").arg("-c").
+        arg("llvm-dis ".to_owned() + bitcode_path.as_str())
+        .output().expect("Fail to disassemble llvm bitcode.");
+    if !llvm_dis_output.status.success() {
+        panic!("{}", String::from_utf8_lossy(&llvm_dis_output.stderr));
+    }
+
+    // generate riscv64 assembly
+    let gen_rv64_output = Command::new("sh").arg("-c")
+        .arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
+        .output().expect("Fail to generate RISC-V assembly code.");
+    if !gen_rv64_output.status.success() {
+        panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
+    }
+}
 
 
 fn main() {
@@ -37,33 +80,7 @@ fn main() {
             GNCErr::handle(&GNCErr::InvalidSuffix, None);
         }
 
-
-        let mut bitcode_path = String::from(file_path);
-        bitcode_path.pop();
-        bitcode_path.push_str("bc");
-
-        println!(">>> {} {} <<<", "Start compiling".green(), file_path.blue());
-        let ast = parser::parse(file_path);
-
-        let context = Context::create();
-        let mut code_gen = CodeGen::new(&context, file_path);
-        code_gen.gen(&ast);
-
-        // generate llvm-ir code
-        let llvm_dis_output = Command::new("sh").arg("-c").
-            arg("llvm-dis ".to_owned() + bitcode_path.as_str())
-            .output().expect("Fail to disassemble llvm bitcode.");
-        if !llvm_dis_output.status.success() {
-            panic!("{}", String::from_utf8_lossy(&llvm_dis_output.stderr));
-        }
-
-        // generate riscv64 assembly
-        let gen_rv64_output = Command::new("sh").arg("-c")
-            .arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
-            .output().expect("Fail to generate RISC-V assembly code.");
-        if !gen_rv64_output.status.success() {
-            panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
-        }
+        parse_file(file_path);
 
         println!(">>> {} <<<", "Done!".green());
     } else {
@@ -74,9 +91,10 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use walkdir::WalkDir;
+
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
-    use walkdir::WalkDir;
 
     #[test]
     fn test_compile() {
@@ -91,32 +109,7 @@ mod tests {
             let source_path = raw_path.unwrap();
             if !source_path.ends_with(".c") { continue; }
 
-            let mut bitcode_path = String::from(source_path);
-            bitcode_path.pop();
-            bitcode_path.push_str("bc");
-
-            println!(">>> {} {} <<<", "Start compiling".green(), source_path.blue());
-            let ast = parser::parse(source_path);
-
-            let context = Context::create();
-            let mut code_gen = CodeGen::new(&context, source_path);
-            code_gen.gen(&ast);
-
-            // generate llvm-ir code
-            let llvm_dis_output = Command::new("sh").arg("-c").
-                arg("llvm-dis ".to_owned() + bitcode_path.as_str())
-                .output().expect("Fail to disassemble llvm bitcode.");
-            if !llvm_dis_output.status.success() {
-                panic!("{}", String::from_utf8_lossy(&llvm_dis_output.stderr));
-            }
-
-            // generate riscv64 assembly
-            let gen_rv64_output = Command::new("sh").arg("-c")
-                .arg("llc --march=riscv64 --filetype=asm ".to_owned() + bitcode_path.as_str())
-                .output().expect("Fail to generate RISC-V assembly code.");
-            if !gen_rv64_output.status.success() {
-                panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
-            }
+            parse_file(source_path);
 
             println!(">>> {} <<<", "Done!".green());
         }
