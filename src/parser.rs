@@ -1,4 +1,7 @@
 use pest::iterators::{Pair};
+use std::fs::{File};
+use std::io::Read;
+use std::fmt;
 use serde::{Serialize};
 
 
@@ -14,6 +17,12 @@ pub struct GNCParser;
 pub enum GNCType {
     Void,
     Int,
+}
+
+impl fmt::Display for GNCType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 
@@ -69,7 +78,6 @@ pub enum AssignOperation {
 }
 
 
-// TODO add function call's AST
 #[derive(Serialize, Debug)]
 pub enum GNCAST {
     // Function AST: return type, name, parameter list and code block
@@ -91,6 +99,9 @@ pub enum GNCAST {
 
     // Function Call:
     FunctionCall(String, Vec<GNCAST>),
+
+    // Global Variable
+    GlobalDeclaration(GNCType, String, Box<GNCAST>),
 
     ContinueStatement,
     BreakStatement,
@@ -175,9 +186,49 @@ fn visit_function_parameter_list(pair: Pair<'_, Rule>, func_param_list: &mut Vec
     }
 }
 
+// parse global variable
+fn visit_global_variable(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
+    let mut data_type: GNCType = GNCType::Int;
+    let mut variable_name: String = String::new();
 
-// TODO global variable
-fn visit_global_variable(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {}
+    let mut pairs = pair.into_inner();
+    let mut token_pair = pairs.next();
+    let mut uncommitted = false;
+
+    while token_pair.is_some() {
+        let token = token_pair.unwrap();
+        match token.as_rule() {
+            Rule::data_type => {
+                data_type = visit_data_type(token);
+            }
+            Rule::identifier => {
+                if uncommitted {
+                    ast.push(GNCAST::GlobalDeclaration(data_type,
+                                                       variable_name.clone(),
+                                                       Box::new(GNCAST::IntLiteral(0))));
+                }
+                variable_name = token.as_str().to_string();
+                uncommitted = true;
+            }
+            Rule::expression => {
+                if uncommitted {
+                    ast.push(GNCAST::GlobalDeclaration(data_type,
+                                                       variable_name.clone(),
+                                                       Box::new(visit_expression(token))));
+                    uncommitted = false;
+                }
+            }
+            _ => { panic!("[ERROR] unexpected token while parsing declaration statement"); }
+        }
+        token_pair = pairs.next();
+    }
+
+    if uncommitted {
+        ast.push(GNCAST::GlobalDeclaration(data_type,
+                                           variable_name.clone(),
+                                           Box::new(GNCAST::IntLiteral(0))));
+    }
+}
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -278,29 +329,27 @@ fn visit_declaration_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<G
     let mut data_type: GNCType = GNCType::Int;
     let mut variable_name: String = String::new();
 
-    for token in pair.into_inner() {
+    let mut pairs = pair.into_inner();
+    let mut token_pair = pairs.next();
+
+    while token_pair.is_some() {
+        let token = token_pair.unwrap();
         match token.as_rule() {
             Rule::data_type => {
                 data_type = visit_data_type(token);
             }
-            Rule::declaration => {
-                for inner_token in token.into_inner() {
-                    match inner_token.as_rule() {
-                        Rule::identifier => {
-                            variable_name = inner_token.as_str().to_string();
-                            func_statements.push(GNCAST::Declaration(data_type, variable_name.clone()))
-                        }
-                        Rule::expression => {
-                            func_statements.push(GNCAST::Assignment(AssignOperation::Simple,
-                                                                    variable_name.clone(),
-                                                                    Box::new(visit_expression(inner_token))));
-                        }
-                        _ => { panic!() }
-                    }
-                }
+            Rule::identifier => {
+                variable_name = token.as_str().to_string();
+                func_statements.push(GNCAST::Declaration(data_type, variable_name.clone()))
+            }
+            Rule::expression => {
+                func_statements.push(GNCAST::Assignment(AssignOperation::Simple,
+                                                        variable_name.clone(),
+                                                        Box::new(visit_expression(token))));
             }
             _ => { panic!("[ERROR] unexpected token while parsing declaration statement"); }
         }
+        token_pair = pairs.next();
     }
 }
 

@@ -7,16 +7,20 @@ gnc = {
     ~EOI
 }
 
+
 //>>>>>>>>>>>>>>>>>>>>>>
 //  GLOBAL VARIABLES
 //<<<<<<<<<<<<<<<<<<<<<<
-global_variable = { declaration_statement ~ ";" }
+global_variable = { data_type ~
+    (identifier ~ ("=" ~ expression)?) ~
+    ("," ~ (identifier ~ ("=" ~ expression)?))* ~ ";"
+}
 
 //>>>>>>>>>>>>>>>>>>>
 //      FUNCTIONS
 //<<<<<<<<<<<<<<<<<<<
 function = { data_type ~ identifier ~ function_parameter_list ~ "{" ~ statement* ~ "}" }
-function_parameter_list = { "(" ~ (function_parameter ~ ",")*  ~ function_parameter? ~ ")" }
+function_parameter_list = { "(" ~ function_parameter? ~ ("," ~ function_parameter)*  ~ ")" }
 function_parameter = { data_type ~ identifier }
 
 
@@ -44,10 +48,10 @@ statement = {
 
 // declaration statement
 declaration_statement = {
-    data_type ~ ( declaration ~  ",")*  ~ declaration   // declaration
+    data_type ~ (identifier ~ ("=" ~ expression)?) ~
+    ("," ~ (identifier ~ ("=" ~ expression)?))*     // declaration
 }
 
-// assignment_statement = { identifier ~ "=" ~ expression ~ ( "," ~ identifier ~ "=" ~ expression )* }
 return_statement = { "return" ~ expression? }
 if_statement = { "if" ~ "(" ~ expression ~ ")" ~ statement ~ ("else" ~ statement)? }
 while_statement = { "while" ~ "(" ~ expression? ~ ")" ~ statement }
@@ -102,7 +106,7 @@ assignment_expression = { identifier ~ (assign_simple | assign_div | assign_mul 
 
 // function call
 function_call = {
-    identifier ~ "(" ~ (expression ~ ",")* ~ expression?  ~ ")"
+    identifier ~ "(" ~ expression? ~ ("," ~ expression)* ~ ")"
 }
 
 

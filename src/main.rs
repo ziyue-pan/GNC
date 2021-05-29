@@ -8,6 +8,9 @@ extern crate serde;
 extern crate walkdir;
 
 
+use codegen::CodeGen;
+use checker::GNCErr;
+use std::process::Command;
 use std::fs::File;
 use std::io::Read;
 // use std::process::Command;
@@ -78,7 +81,7 @@ fn main() {
         let split = split.collect::<Vec<&str>>();
 
         if split.len() == 0 || split[split.len() - 1] != "c" {
-            GNCError::handle(&GNCError::InvalidSuffix, None);
+            GNCErr::handle(&GNCErr::InvalidSuffix, None);
         }
 
         parse_file(file_path);

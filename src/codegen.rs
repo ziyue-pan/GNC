@@ -7,10 +7,10 @@ use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, C
 use inkwell::{IntPredicate};
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
-use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue};
+use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue, BasicValueEnum};
 use inkwell::basic_block::BasicBlock;
-use inkwell::types::{BasicTypeEnum};
-use checker::GNCError;
+use inkwell::types::{BasicTypeEnum, BasicType};
+use checker::GNCErr;
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -37,6 +37,8 @@ pub struct CodeGen<'ctx> {
     continue_labels: VecDeque<BasicBlock<'ctx>>,
     // hashset for functions
     function_set: HashSet<String>,
+    // hashset for global variable
+    global_variable_map: HashMap<String, PointerValue<'ctx>>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -62,6 +64,7 @@ impl<'ctx> CodeGen<'ctx> {
             break_labels: VecDeque::new(),
             continue_labels: VecDeque::new(),
             function_set: HashSet::new(),
+            global_variable_map: HashMap::new(),
         }
     }
 
@@ -72,14 +75,18 @@ impl<'ctx> CodeGen<'ctx> {
             match node {
                 GNCAST::Function(ref func_type,
                                  ref func_name,
-                                 ref func_param,
-                                 ref func_body) => {
+                                 ref func_param, _) => {
                     self.gen_function_proto(func_type, func_name, func_param);
+                }
+                GNCAST::GlobalDeclaration(
+                    ref var_type,
+                    ref var_name,
+                    ref ptr_to_init) => {
+                    self.gen_global_variable(var_type, var_name, ptr_to_init);
                 }
                 _ => { panic!(); }
             }
         }
-
 
         // second scan
         for node in ast {
@@ -90,8 +97,7 @@ impl<'ctx> CodeGen<'ctx> {
                                  ref func_body) => {
                     self.gen_function_def(func_type, func_name, func_param, func_body);
                 }
-                // TODO Update global hashmap: addr_map_stack[addr_map_stack.len() - 1].insert(identifier, PointerValue);
-                _ => { panic!(); }
+                _ => {}
             }
         }
 
@@ -126,6 +132,33 @@ impl<'ctx> CodeGen<'ctx> {
     }
 
 
+    // generate global variable
+    fn gen_global_variable(&mut self,
+                           var_type: &GNCType,
+                           var_name: &String,
+                           ptr_to_init: &Box<GNCAST>) {
+        if self.global_variable_map.contains_key(var_name) {
+            GNCErr::handle(&GNCErr::DuplicateGlobalVar(var_name.to_string()),
+                           None);
+        }
+
+        let llvm_var_type = self.to_basic_type(var_type);
+
+        let global_value = self.module.add_global(llvm_var_type,
+                                                  None,
+                                                  var_name.as_str());
+
+
+        // TODO add const_val check
+        let init_value = self.gen_expression(&**ptr_to_init);
+        global_value.set_initializer(&init_value);
+
+
+        self.global_variable_map.insert(var_name.to_string(),
+                                        global_value.as_pointer_value());
+    }
+
+
     // generate function proto
     fn gen_function_proto(&mut self,
                           func_type: &GNCType,
@@ -133,8 +166,8 @@ impl<'ctx> CodeGen<'ctx> {
                           func_param: &Vec<GNCParameter>) {
         // cannot handle duplicate function
         if self.function_set.contains(func_name) {
-            GNCError::handle(&GNCError::DuplicateFunction(func_name.to_string()),
-                             None);
+            GNCErr::handle(&GNCErr::DuplicateFunction(func_name.to_string()),
+                           None);
         }
 
         // function parameter should be added in this llvm_func_type
@@ -239,12 +272,19 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn get_point_value(&self, identifier: &String) -> PointerValue {
         for map in self.addr_map_stack.iter().rev() {
-            match map.get(identifier) {
-                Some(addr) => { return *addr; }
-                _ => {}
+            let rst = map.get(identifier);
+            if rst.is_some() {
+                return *rst.unwrap();
             }
         }
-        panic!(identifier.to_string() + " not found!");
+
+        let global_rst = self.global_variable_map.get(identifier);
+        if global_rst.is_some() {
+            return *global_rst.unwrap();
+        }
+
+        GNCErr::handle(&GNCErr::MissingVariable(identifier.to_string()), None);
+        panic!();
     }
 
     fn save_ptr_val(&mut self, identifier: &String, ptr_val: PointerValue<'ctx>) {
@@ -351,12 +391,52 @@ impl<'ctx> CodeGen<'ctx> {
 
     fn gen_function_call(&self,
                          function_name: &String,
-                         parameters: &Vec<GNCAST>) {
-        // TODO generate function call
-        let func = self.module.get_function(function_name);
-        if func.is_none() {
-            GNCError::handle(&GNCError::MissingFunction(function_name.to_string()), None);
+                         parameters: &Vec<GNCAST>) -> IntValue {
+        let func_option = self.module.get_function(function_name);
+        if func_option.is_none() {
+            GNCErr::handle(&GNCErr::MissingFunction(
+                function_name.to_string()), None);
         }
+
+        let func = func_option.unwrap();
+        let func_param_count = func.get_type().count_param_types();
+
+        // handle calling parameter count mismatch
+        if parameters.len() != func_param_count as usize {
+            GNCErr::handle(&GNCErr::ParameterCountMismatch(
+                function_name.to_string(),
+                func_param_count as usize,
+                parameters.len(),
+            ), None);
+        }
+
+        let mut compiled_args: Vec<BasicValueEnum> =
+            Vec::with_capacity(parameters.len());
+
+
+        for (i, arg) in parameters.iter().enumerate() {
+            let arg_value = self.gen_expression(arg).as_basic_value_enum();
+
+            let func_param = func.get_nth_param(i as u32).unwrap();
+
+            if arg_value.get_type() == func_param.get_type() {
+                compiled_args.push(BasicValueEnum::from(
+                    self.gen_expression(arg)));
+            } else {
+                GNCErr::handle(&GNCErr::ParameterMismatch(), None)
+            }
+        }
+
+        let value = self.builder.build_call(func_option.unwrap(),
+                                            compiled_args.as_slice(),
+                                            "").try_as_basic_value().left();
+
+        if value.is_some() {
+            return value.unwrap().into_int_value();
+        }
+
+        GNCErr::handle(&GNCErr::InvalidFunctionCall(), None);
+        panic!()
     }
 
     fn gen_for_statement(&mut self,
@@ -530,6 +610,9 @@ impl<'ctx> CodeGen<'ctx> {
             GNCAST::BinaryExpression(ref op, ref lhs, ref rhs) => {
                 self.gen_binary_expression(op, lhs, rhs)
             }
+            GNCAST::FunctionCall(ref function_name, ref parameters) => {
+                self.gen_function_call(function_name, parameters)
+            }
             _ => { panic!("Invalid Expression Type") }
         }
     }
@@ -604,6 +687,9 @@ impl<'ctx> CodeGen<'ctx> {
 
 
     fn gen_block_statements(&mut self, block: &Box<GNCAST>) {
+        let local_map: HashMap<String, PointerValue> = HashMap::new();
+        self.addr_map_stack.push(local_map);
+
         match **block {
             GNCAST::BlockStatement(ref statements) => {
                 for statement in statements {
@@ -612,6 +698,8 @@ impl<'ctx> CodeGen<'ctx> {
             }
             _ => { panic!() }
         }
+
+        self.addr_map_stack.pop();
     }
 
     fn no_terminator(&self) -> bool {
@@ -620,10 +708,13 @@ impl<'ctx> CodeGen<'ctx> {
         return terminator.is_none();
     }
 
-// fn to_llvm_type(&self, t: GNCType) -> &BasicType<'ctx> {
-//     match t {
-//         GNCType::Void => self.context.i32_type(),
-//         GNCType::Int => self.context.i32_type(),
-//     }
-// }
+    fn to_basic_type(&self, in_type: &GNCType) -> BasicTypeEnum<'ctx> {
+        match in_type {
+            GNCType::Int => self.context.i32_type().as_basic_type_enum(),
+            _ => {
+                GNCErr::handle(&GNCErr::InvalidType(*in_type), None);
+                panic!()
+            }
+        }
+    }
 }
