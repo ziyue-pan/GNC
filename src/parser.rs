@@ -1,19 +1,19 @@
-use pest::Parser;
 use pest::iterators::{Pair};
 use std::fs::{File};
 use std::io::Read;
 use std::fmt;
+use serde::{Serialize};
 
 
-#[derive(Parser)]
+#[derive(Parser, Serialize)]
 #[grammar = "./gnc.pest"]
-struct GNCParser;
+pub struct GNCParser;
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 //      All the AST Enums
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub enum GNCType {
     Void,
     Int,
@@ -26,20 +26,20 @@ impl fmt::Display for GNCType {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct GNCParameter {
     pub param_type: GNCType,
     pub param_name: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum UnaryOperator {
     UnaryMinus,
     LogicalNot,
     BitwiseComplement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum BinaryOperator {
     Add,
     Subtract,
@@ -62,7 +62,7 @@ pub enum BinaryOperator {
     FetchRHS,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum AssignOperation {
     Simple,
     Addition,
@@ -78,7 +78,7 @@ pub enum AssignOperation {
 }
 
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 pub enum GNCAST {
     // Function AST: return type, name, parameter list and code block
     Function(GNCType, String, Vec<GNCParameter>, Vec<GNCAST>),
@@ -121,17 +121,9 @@ pub enum GNCAST {
 
 
 // driver for the parser
-pub fn parse(source_path: &str) -> Vec<GNCAST> {
-    let mut source_file: File = File::open(source_path).expect("Unable to open source file!");
-    let mut source_content: String = String::new();
-    source_file.read_to_string(&mut source_content).expect("Unable to read the file!");
-
-    let mut pairs = GNCParser::parse(Rule::gnc, &source_content).unwrap_or_else(|e| panic!("{}", e));
+pub fn parse(gnc_pair: Pair<'_, Rule>) -> Vec<GNCAST> {
     let mut ast = vec![];
-    let gnc_pair = pairs.next().unwrap();
-
     visit_gnc(gnc_pair, &mut ast);
-
     return ast;
 }
 
