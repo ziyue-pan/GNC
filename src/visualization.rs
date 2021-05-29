@@ -9,6 +9,7 @@ extern crate walkdir;
 use serde::{Serialize};
 use wasm_bindgen::prelude::*;
 use pest::Parser;
+use pest::iterators::Pair;
 
 mod parser;
 
@@ -19,13 +20,41 @@ struct VisTreeNode {
     children: Vec<VisTreeNode>
 }
 
+#[derive(Debug, Serialize)]
+struct VisResult {
+    parse_tree: VisTreeNode,
+    // ast: VisTreeNode
+}
+
+fn visualize_parse_tree(pair: Pair<'_, parser::Rule>) -> VisTreeNode {
+    let node_id = format!("{:?}({},{})", pair.as_rule(), pair.as_span().start(), pair.as_span().end());
+    let node_label = format!("{:?}", pair.as_rule());
+    let mut node_children: Vec<VisTreeNode> = Vec::new();
+    for token in pair.into_inner() {
+        node_children.push(visualize_parse_tree(token));
+    }
+
+    let mut parse_tree = VisTreeNode{
+        id: node_id,
+        label: node_label,
+        children: node_children
+    };
+
+    return parse_tree;
+}
+
 #[wasm_bindgen]
 pub fn compile_result(code: &str) -> String {
     let mut pairs = parser::GNCParser::parse(parser::Rule::gnc, &code).unwrap_or_else(|e| panic!("{}", e));
     let gnc_pair = pairs.next().unwrap();
+    let parse_tree = visualize_parse_tree(gnc_pair.clone());
     let ast = parser::parse(gnc_pair);
-    let serialized_ast = serde_json::to_string(&ast).unwrap();
-    return serialized_ast;
+    let res = VisResult {
+        parse_tree,
+        // ast
+    };
+    let serialized_res = serde_json::to_string(&res).unwrap();
+    return serialized_res;
 }
 
 #[cfg(test)]
