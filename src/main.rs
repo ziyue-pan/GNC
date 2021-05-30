@@ -6,10 +6,12 @@ extern crate pest;
 extern crate pest_derive;
 extern crate serde;
 extern crate walkdir;
+extern crate thiserror;
+extern crate anyhow;
 
 
 use codegen::CodeGen;
-use checker::GNCErr;
+use checker::{GNCErr};
 use std::process::Command;
 use std::fs::File;
 use std::io::Read;
@@ -18,6 +20,7 @@ use pest::Parser;
 use clap::{App, Arg};
 use inkwell::context::Context;
 use colored::Colorize;
+use anyhow::Error;
 
 mod parser;
 mod codegen;
@@ -42,7 +45,13 @@ fn parse_file(file_path: &str) {
 
     let context = Context::create();
     let mut code_gen = CodeGen::new(&context, file_path);
-    code_gen.gen(&ast);
+
+    let gen_rst = code_gen.gen(&ast);
+
+    match gen_rst {
+        Ok(_) => {}
+        Err(err) => { panic!("{}", err); }
+    }
 
     // generate llvm-ir code
     let llvm_dis_output = Command::new("sh").arg("-c").
@@ -77,7 +86,8 @@ fn main() {
         let split = split.collect::<Vec<&str>>();
 
         if split.len() == 0 || split[split.len() - 1] != "c" {
-            GNCErr::handle(&GNCErr::InvalidSuffix, None);
+            let err = GNCErr::InvalidSuffix;
+            panic!("{}", err);
         }
 
         parse_file(file_path);
