@@ -26,7 +26,3 @@
 
 
 
-## Reference
-
-- [toy-c compiler implemented by rust and llvm](https://github.com/maekawatoshiki/rucc)
-- [C PEG grammar script](https://github.com/pointlander/peg/blob/master/grammars/c/c.peg)
