@@ -31,7 +31,7 @@ jobs:
       run: cargo build
 
     - name: Test Compilation
-      run: cargo test tests::test_compile -- --exact --nocapture
+      run: cargo test --package GNC --bin GNC tests::test_compile -- --exact
 
     # - name: Test Correctness
       
