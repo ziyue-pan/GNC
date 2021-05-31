@@ -5,6 +5,7 @@ import Editor from "@monaco-editor/react";
 import AntVTree from "./components/AntVG6";
 import mockASTData from './components/test.json';
 import {Card} from "./components/Card";
+import {compile_result} from "gnc"
 
 const Button = styled.button.attrs({
     className: "flex flex-grow-0 py-2 px-4 font-semibold rounded-lg shadow-md text-white bg-green-500 hover:bg-green-700"
@@ -43,6 +44,13 @@ const InitialCode = `int main (int a) {
 
 function App() {
     const [code, editCode] = useState(InitialCode)
+    const [parseTree, setParseTree] = useState(mockASTData)
+
+    const compile = () => {
+        let data = JSON.parse(compile_result(code))
+        setParseTree(data['parse_tree'])
+    }
+
     return (
         <div className={'bg-green-100'}>
             <Header>
@@ -76,10 +84,10 @@ function App() {
                             <CardLabelText className={'text-opacity-50'}>AST</CardLabelText>
                         </div>
                     }
-                    right={<Button>Compile</Button>}
+                    right={<Button onClick={compile}>Compile</Button>}
                     content={
                         <AntVTree
-                            data={mockASTData}
+                            data={parseTree}
                         />
                     }
                 />
