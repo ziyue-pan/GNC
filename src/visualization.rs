@@ -24,7 +24,7 @@ struct VisTreeNode {
 #[derive(Debug, Serialize)]
 struct VisResult {
     parse_tree: VisTreeNode,
-    ast: String
+    ast: Vec<GNCAST>
 }
 
 fn visualize_parse_tree(pair: Pair<'_, parser::Rule>) -> VisTreeNode {
@@ -44,10 +44,6 @@ fn visualize_parse_tree(pair: Pair<'_, parser::Rule>) -> VisTreeNode {
     return parse_tree;
 }
 
-// fn visualize_ast(ast: Vec<GNCAST>) -> VisTreeNode {
-//
-// }
-
 #[wasm_bindgen]
 pub fn compile_result(code: &str) -> String {
     let mut pairs = parser::GNCParser::parse(parser::Rule::gnc, &code).unwrap_or_else(|e| panic!("{}", e));
@@ -56,7 +52,7 @@ pub fn compile_result(code: &str) -> String {
     let ast = parser::parse(gnc_pair);
     let res = VisResult {
         parse_tree,
-        ast: serde_json::to_string(&ast).unwrap()
+        ast
     };
     let serialized_res = serde_json::to_string(&res).unwrap();
     return serialized_res;
