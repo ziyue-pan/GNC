@@ -17,7 +17,7 @@ jobs:
           override: true
 
       - name: Install WASM Toolchains
-        run: cargo install wasm-pack && apt-get update && apt-get install binaryen -y
+        run: cargo install wasm-pack && sudo apt-get update && sudo apt-get install binaryen -y
       - name: Build WASM
         run: bash ./build_wasm.sh
 
