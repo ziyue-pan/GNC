@@ -31,7 +31,7 @@ jobs:
       run: cargo build
 
     - name: Test Compilation
-      run: cargo test --package GNC --bin GNC tests::test_compile -- --exact
+      run: cargo test --package GNC --bin GNC tests::test_compile --features web
 
     # - name: Test Correctness
       
