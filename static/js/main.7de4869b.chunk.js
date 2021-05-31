@@ -1,0 +1,2 @@
+(this["webpackJsonpgnc-frontend"]=this["webpackJsonpgnc-frontend"]||[]).push([[0],[function(n,o,r){Promise.all([r.e(2),r.e(3)]).then(r.bind(null,1)).catch((function(n){return console.error("Error importing `entrypoint.js`:",n)}))}],[[0,1]]]);
+//# sourceMappingURL=main.7de4869b.chunk.js.map
