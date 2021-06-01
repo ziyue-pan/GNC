@@ -81,7 +81,7 @@ export default function AntVTree(props) {
                         return 80;
                     },
                     getHGap: function getHGap() {
-                        return 20;
+                        return 50;
                     },
                 },
                 plugins: [tooltip],
