@@ -1,6 +1,8 @@
 use pest::iterators::{Pair};
 use std::fmt;
 use serde::{Serialize};
+use types::GNCType;
+
 
 
 #[derive(Parser, Serialize)]
@@ -11,21 +13,6 @@ pub struct GNCParser;
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 //      All the AST Enums
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-#[derive(Clone, Copy, Debug, Serialize)]
-pub enum GNCType {
-    Void,
-    Bool,
-    Byte,
-    UnsignedByte,
-    Short,
-    UnsignedShort,
-    Int,
-    UnsignedInt,
-    Long,
-    UnsignedLong,
-    Float,
-    Double,
-}
 
 impl fmt::Display for GNCType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

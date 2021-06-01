@@ -1,7 +1,7 @@
 use colored::{Colorize};
 //use pest::Span;
-use parser::GNCType;
 use thiserror::Error;
+use types::GNCType;
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -13,23 +13,35 @@ use thiserror::Error;
 // TODO add more info in parameter mismatch
 #[derive(Error, Debug)]
 pub enum GNCErr {
+    /* --- MISC --- */
     #[error("the source file extension must be `.c`!")]
     InvalidSuffix,
 
+    /* --- functions --- */
     #[error("cannot find function: {:?}", .0.as_str().yellow())]
     MissingFunction(String),
+
+    #[error("there are duplicate functions: {:?}", 0.as_str().yellow())]
+    DuplicateFunction(String),
+
+    /* --- variables --- */
+    #[error("there are duplicate global variables: {:?}", 0.as_str().yellow())]
+    DuplicateGlobalVar(String),
+
 
     #[error("")]
     MissingVariable(String),
 
-    #[error("")]
-    DuplicateFunction(String),
-
-    #[error("")]
-    DuplicateGlobalVar(String),
-
+    /* --- types --- */
     #[error("")]
     InvalidType(GNCType),
+
+    #[error("")]
+    InvalidCast(),
+
+    /* unary expression */
+    #[error("")]
+    InvalidUnary(),
 
     #[error("")]
     ParameterCountMismatch(String, usize, usize),
@@ -41,7 +53,7 @@ pub enum GNCErr {
     InvalidFunctionCall(),
 
     #[error("")]
-    ImplicitTypeCast(),
+    TypeMismatch(),
 
     #[error("")]
     InvalidFloatingPointOperation(),
@@ -49,8 +61,6 @@ pub enum GNCErr {
     #[error("")]
     ReturnTypeMismatch(),
 
-    #[error("")]
-    InvalidCast(),
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),  // source and Display delegate to anyhow::Error

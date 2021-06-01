@@ -20,8 +20,8 @@ use pest::Parser;
 use clap::{App, Arg};
 use inkwell::context::Context;
 use colored::Colorize;
-use anyhow::Error;
 
+mod types;
 mod parser;
 mod codegen;
 mod checker;
