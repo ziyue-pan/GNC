@@ -2,8 +2,12 @@
 name = "GNC"
 version = "0.1.0"
 
+[features]
+default = ["local"]
+local = ["inkwell", "clap"]
+web = ["wasm-bindgen"]
+
 [dependencies]
-clap = "2.33.3"
 pest = "2.1.3"
 pest_derive = "2.1.0"
 thiserror = "1.0"
@@ -12,14 +16,15 @@ inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", feat
 colored = "2.0.0"
 lazy_static = "1.4.0"   # For efficiency
 walkdir = "2.3.2"
-wasm-bindgen = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+clap = { version = "2.33.3", optional = true }
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm11-0"], optional = true }
+
+wasm-bindgen = { version = "0.2", optional = true }
 
 [lib]
 name = "gnc_vis_lib"
 path = "src/visualization.rs"
 crate-type =["cdylib"]
-
-#[build]
-#target = "wasm64-wasi"

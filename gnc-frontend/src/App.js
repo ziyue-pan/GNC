@@ -1,64 +1,95 @@
 import './App.css';
-import {useState} from "react";
-import styled from 'styled-components'
+import {useEffect, useState} from "react";
+import {Button, Card, CardLabelText, Footer, Header, Input, Title} from "./components/Basic"
 import Editor from "@monaco-editor/react";
 import AntVTree from "./components/AntVG6";
-import mockASTData from './components/test.json';
-import {Card} from "./components/Card";
+import DropMenu from "./components/DropMenu";
+import Modal from "./components/Modal";
+import {compile_result} from "gnc";
+import AST2VisualizationData from "./utils/AST2VisData";
+import {ExampleOptions} from "./data/examples";
 
-const Button = styled.button.attrs({
-    className: "flex flex-grow-0 py-2 px-4 font-semibold rounded-lg shadow-md text-white bg-green-500 hover:bg-green-700"
-})``;
-
-const Header = styled.header.attrs({
-    className: "flex flex-auto"
-})`
-    height: 17vh;
-`;
-
-const Footer = styled.footer.attrs({
-    className: "flex flex-auto "
-})`
-    height: 3vh;
-    min-height: 35px;
-`;
-
-const CardLabelText = styled.span.attrs({
-    className: "flex text-white text-3xl object-center font-bold pl-2 pt-1"
-})``;
-
-const Title = styled.span.attrs({
-    className: "bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-500"
-})`
-    line-height: 15vh;
-`;
-
-const Input = styled.input.attrs({
-    className: "text-green-900 rounded-lg shadow-md border-2 border-green-500"
-})``;
-
-const InitialCode = `int main (int a) {
-    return a;
-}`
+const VisOptions = [
+    {
+        id: 1,
+        name: 'Parse Tree',
+    },
+    {
+        id: 2,
+        name: 'AST',
+    },
+]
 
 function App() {
-    const [code, editCode] = useState(InitialCode)
+    // visualization hooks
+    const [parseTree, setParseTree] = useState({id: '0', label: 'GNC'})
+    const [AST, setAST] = useState({id: '0', label: 'GNC'})
+    const [visMode, setVisMode] = useState(VisOptions[0])
+
+    // code hooks
+    const [exampleCode, setExampleCode] = useState(ExampleOptions[0])
+    const [code, editCode] = useState(exampleCode.code)
+
+    // modal hooks
+    const [showError, setShowError] = useState(false)
+    const [errorTitle, setErrorTitle] = useState('')
+    const [errorContent, setErrorContent] = useState('')
+
+    const compile = () => {
+        let data = JSON.parse(compile_result(code))
+        if (!data.error) {
+            setParseTree(data['parse_tree'])
+            setAST(AST2VisualizationData(data['ast']))
+        } else {
+            setErrorTitle('Compilation Error')
+            setErrorContent(data['error_message'])
+            setShowError(true)
+        }
+    }
+
+    const handleExampleCodeChange = (option) => {
+        setExampleCode(option)
+        editCode(option.code)
+    }
+
+    useEffect(() => {
+        compile()
+        // eslint-disable-next-line
+    }, [])
+
     return (
         <div className={'bg-green-100'}>
+            <Modal
+                visible={showError}
+                title={errorTitle}
+                content={errorContent}
+                onClose={setShowError}
+            />
             <Header>
-                <div className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-center object-center align-middle font-extrabold w-full h-full">
+                <div
+                    className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-center object-center align-middle font-extrabold w-full h-full">
                     <Title>
                         GNC Compiler Online
                     </Title>
-                    <a href={'https://github.com/PAN-Ziyue/GNC'}>
-                        <img className={'mx-auto flex-grow-0 p-1'} src={'https://img.shields.io/github/stars/PAN-Ziyue/GNC'} alt={'GitHub Repo'}/>
-                    </a>
+                    <div className={'flex'}>
+                        <div className={'flex flex-auto'}/>
+                        <a className={'flex'} href={'https://github.com/PAN-Ziyue/GNC'}>
+                            <img className={'flex mx-auto p-1'} src={'https://img.shields.io/github/stars/PAN-Ziyue/GNC'}
+                                 alt={'GitHub Repo'}/>
+                        </a>
+                        <div className={'flex flex-auto'}/>
+                    </div>
                 </div>
             </Header>
             <div className={"flex flex-auto flex-col lg:flex-row"}>
                 <Card
                     left={<CardLabelText>Code</CardLabelText>}
-                    right={<Button>Run</Button>}
+                    right={<DropMenu
+                        widthClass={'w-44'}
+                        options={ExampleOptions}
+                        defaultOption={exampleCode}
+                        onChange={handleExampleCodeChange}
+                    />}
                     content={
                         <Editor
                             defaultLanguage="c"
@@ -70,16 +101,24 @@ function App() {
                 />
                 <Card
                     left={
-                        <div className={'flex flex-row'}>
-                            <CardLabelText>Parse Tree</CardLabelText>
-                            <CardLabelText>/</CardLabelText>
-                            <CardLabelText className={'text-opacity-50'}>AST</CardLabelText>
+                        <div>
+                            <CardLabelText>Visualization</CardLabelText>
                         </div>
                     }
-                    right={<Button>Compile</Button>}
+                    right={
+                        <div className={'flex flex-row'}>
+                            <DropMenu
+                                widthClass={'w-40'}
+                                options={VisOptions}
+                                defaultOption={visMode}
+                                onChange={setVisMode}
+                            />
+                            <Button onClick={compile}>Compile</Button>
+                        </div>
+                    }
                     content={
                         <AntVTree
-                            data={mockASTData}
+                            data={(visMode.id === 1) ? parseTree : AST}
                         />
                     }
                 />
@@ -99,7 +138,10 @@ function App() {
             </div>
             <Footer>
                 <p className="text-xs lg:text-lg text-green-700 text-opacity-50 text-center object-center w-full">
-                    <a href={'https://github.com/PAN-Ziyue/GNC'} className="no-underline hover:underline">GNC</a> (2021) is the course project of Compilation Principle by Ziyue, MartinNose and <a href={'https://www.ncj.wiki'} className="no-underline hover:underline">NCJ</a>. GNC is a recursive acronym for "GNC's Not C-language!"
+                    <a href={'https://github.com/PAN-Ziyue/GNC'} className="no-underline hover:underline">GNC</a> (2021)
+                    is the course project of Compilation Principle by Ziyue, MartinNose and <a
+                    href={'https://www.ncj.wiki'} className="no-underline hover:underline">NCJ</a>. GNC is a recursive
+                    acronym for "GNC's Not C-language!"
                 </p>
             </Footer>
         </div>

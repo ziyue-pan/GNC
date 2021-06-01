@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import G6 from '@antv/g6';
 
@@ -7,14 +7,35 @@ export default function AntVTree(props) {
         display: 'flex',
         flex: '1 1 auto'
     }
-    const ref = React.useRef(null);
-    let graph = null;
+    const ref = useRef(null);
+    const [graph, setGraph] = useState(null);
 
     useEffect(() => {
         const {width, height} = ref.current.getBoundingClientRect()
         if (!graph) {
+            const tooltip = new G6.Tooltip({
+                offsetX: 10,
+                offsetY: 20,
+                getContent(e) {
+                    const outDiv = document.createElement('div');
+                    outDiv.style.width = '180px';
+                    let content = `<h4><b>${e.item.getModel().label}</b></h4>`
+
+                    if (e.item.getModel().attrs) {
+                        const attrs = e.item.getModel().attrs
+                        content += `<ul>`
+                        for (const attr in attrs) {
+                            content += `<li><b> - ${attr}:</b> ${attrs[attr]}</li>`
+                        }
+                        content += `</ul>`
+                    }
+                    outDiv.innerHTML = content
+                    return outDiv
+                },
+                itemTypes: ['node']
+            });
             // eslint-disable-next-line
-            graph = new G6.TreeGraph({
+            let tmp_graph = new G6.TreeGraph({
                 container: ReactDOM.findDOMNode(ref.current),
                 width: width,
                 height: height,
@@ -59,38 +80,44 @@ export default function AntVTree(props) {
                         return 80;
                     },
                     getHGap: function getHGap() {
-                        return 20;
+                        return 50;
                     },
                 },
+                plugins: [tooltip],
             });
-        }
-        graph.node(function (node) {
-            let position = 'right';
-            let rotate = 0;
-            if (!node.children) {
-                position = 'bottom';
-                rotate = Math.PI / 2;
-            }
-            return {
-                style: {
-                    fill: '#ECFDF5',
-                    stroke: '#34D399',
-                },
-                label: node.label,
-                labelCfg: {
-                    position,
-                    offset: 5,
+            tmp_graph.node(function (node) {
+                let position = 'right';
+                let rotate = 0;
+                if (!node.children) {
+                    position = 'bottom';
+                    rotate = Math.PI / 2;
+                }
+                return {
                     style: {
-                        rotate,
-                        textAlign: 'start',
+                        fill: '#ECFDF5',
+                        stroke: '#34D399',
                     },
-                },
-            };
-        });
-        graph.data(props.data);
-        graph.render();
-        graph.fitView();
-    }, []);
+                    label: node.label,
+                    labelCfg: {
+                        position,
+                        offset: 5,
+                        style: {
+                            rotate,
+                            textAlign: 'start',
+                        },
+                    },
+                };
+            });
+            tmp_graph.data(props.data);
+            tmp_graph.render();
+            tmp_graph.fitView();
+            setGraph(tmp_graph)
+        } else {
+            graph.data(props.data);
+            graph.render();
+            graph.fitView();
+        }
+    }, [graph, props.data]);
 
     return <div style={style} ref={ref}/>;
 }
