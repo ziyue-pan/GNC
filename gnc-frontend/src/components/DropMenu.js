@@ -21,7 +21,7 @@ export default function DropMenu(props) {
             {({open}) => (
                 <div className="relative">
                     <Listbox.Button
-                        className="relative w-40 h-full bg-white border border-gray-300 rounded-lg shadow-sm pl-2 pr-12 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                        className={classNames(props.widthClass, "relative h-full bg-white border border-gray-300 rounded-lg shadow-sm pl-2 pr-12 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm")}
                     >
                             <span className="flex items-center">
                                 <span className="ml-3 block truncate">{selected.name}</span>
@@ -34,9 +34,12 @@ export default function DropMenu(props) {
                     <Transition
                         show={open}
                         as={Fragment}
-                        leave="transition ease-in duration-100"
-                        leaveFrom="opacity-100"
-                        leaveTo="opacity-0"
+                        enter="transition ease-out duration-100"
+                        enterFrom="transform opacity-0 scale-95"
+                        enterTo="transform opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="transform opacity-100 scale-100"
+                        leaveTo="transform opacity-0 scale-95"
                     >
                         <Listbox.Options
                             static
