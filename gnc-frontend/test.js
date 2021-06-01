@@ -8,7 +8,7 @@ const node2tree = (astNode) => {
             id += 1
             let treeNode = {
                 id: id.toString(),
-                label: x,f
+                label: x,
                 attrs: {},
                 children: []
             }
