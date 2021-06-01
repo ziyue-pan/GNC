@@ -4,6 +4,7 @@ import {Button, Card, CardLabelText, Footer, Header, Input, Title} from "./compo
 import Editor from "@monaco-editor/react";
 import AntVTree from "./components/AntVG6";
 import DropMenu from "./components/DropMenu";
+import Modal from "./components/Modal";
 import {compile_result} from "gnc";
 import AST2VisualizationData from "./utils/AST2VisData";
 import {ExampleOptions} from "./data/examples";
@@ -20,12 +21,19 @@ const VisOptions = [
 ]
 
 function App() {
-    // hooks
+    // visualization hooks
     const [parseTree, setParseTree] = useState({id: '0', label: 'GNC'})
     const [AST, setAST] = useState({id: '0', label: 'GNC'})
     const [visMode, setVisMode] = useState(VisOptions[0])
+
+    // code hooks
     const [exampleCode, setExampleCode] = useState(ExampleOptions[0])
     const [code, editCode] = useState(exampleCode.code)
+
+    // modal hooks
+    const [showError, setShowError] = useState(false)
+    const [errorTitle, setErrorTitle] = useState('')
+    const [errorContent, setErrorContent] = useState('')
 
     const compile = () => {
         let data = JSON.parse(compile_result(code))
@@ -33,7 +41,9 @@ function App() {
             setParseTree(data['parse_tree'])
             setAST(AST2VisualizationData(data['ast']))
         } else {
-            alert(data['error_message']) // TODO: Use Modal
+            setErrorTitle('Compilation Error')
+            setErrorContent(data['error_message'])
+            setShowError(true)
         }
     }
 
@@ -49,16 +59,26 @@ function App() {
 
     return (
         <div className={'bg-green-100'}>
+            <Modal
+                visible={showError}
+                title={errorTitle}
+                content={errorContent}
+                onClose={setShowError}
+            />
             <Header>
                 <div
                     className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-center object-center align-middle font-extrabold w-full h-full">
                     <Title>
                         GNC Compiler Online
                     </Title>
-                    <a href={'https://github.com/PAN-Ziyue/GNC'}>
-                        <img className={'mx-auto p-1'} src={'https://img.shields.io/github/stars/PAN-Ziyue/GNC'}
-                             alt={'GitHub Repo'}/>
-                    </a>
+                    <div className={'flex'}>
+                        <div className={'flex flex-auto'}/>
+                        <a className={'flex'} href={'https://github.com/PAN-Ziyue/GNC'}>
+                            <img className={'flex mx-auto p-1'} src={'https://img.shields.io/github/stars/PAN-Ziyue/GNC'}
+                                 alt={'GitHub Repo'}/>
+                        </a>
+                        <div className={'flex flex-auto'}/>
+                    </div>
                 </div>
             </Header>
             <div className={"flex flex-auto flex-col lg:flex-row"}>
