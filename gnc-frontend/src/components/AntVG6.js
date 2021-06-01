@@ -9,7 +9,6 @@ export default function AntVTree(props) {
     }
     const ref = useRef(null);
     const [graph, setGraph] = useState(null);
-    // let graph = null;
 
     useEffect(() => {
         const {width, height} = ref.current.getBoundingClientRect()
@@ -20,13 +19,13 @@ export default function AntVTree(props) {
                 getContent(e) {
                     const outDiv = document.createElement('div');
                     outDiv.style.width = '180px';
-                    let content = `<h4>${e.item.getModel().label}</h4>`
+                    let content = `<h4><b>${e.item.getModel().label}</b></h4>`
 
                     if (e.item.getModel().attrs) {
                         const attrs = e.item.getModel().attrs
                         content += `<ul>`
                         for (const attr in attrs) {
-                            content += `<li> - ${attr}: ${attrs[attr]}</li>`
+                            content += `<li><b> - ${attr}:</b> ${attrs[attr]}</li>`
                         }
                         content += `</ul>`
                     }

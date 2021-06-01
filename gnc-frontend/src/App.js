@@ -6,6 +6,7 @@ import AntVTree from "./components/AntVG6";
 import mockASTData from './components/test.json';
 import {Card} from "./components/Card";
 import {compile_result} from "gnc"
+import AST2VisualizationData from "./utils/AST2VisData"
 
 const Button = styled.button.attrs({
     className: "flex flex-grow-0 py-2 px-4 font-semibold rounded-lg shadow-md text-white bg-green-500 hover:bg-green-700"
@@ -49,8 +50,8 @@ function App() {
     const compile = () => {
         let data = JSON.parse(compile_result(code))
         if (!data.error) {
-            setParseTree(data['parse_tree'])
-            console.log(data['ast'])
+            setParseTree(AST2VisualizationData(data['ast']))
+            // console.log(data['ast'])
         } else {
             alert(data['error_message']) // TODO: Use Modal
         }
