@@ -1,8 +1,8 @@
 use pest::iterators::{Pair};
-use std::fs::{File};
-use std::io::Read;
 use std::fmt;
 use serde::{Serialize};
+use types::GNCType;
+
 
 
 #[derive(Parser, Serialize)]
@@ -13,21 +13,6 @@ pub struct GNCParser;
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 //      All the AST Enums
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-#[derive(Clone, Copy, Debug, Serialize)]
-pub enum GNCType {
-    Void,
-    Bool,
-    Byte,
-    UnsignedByte,
-    Short,
-    UnsignedShort,
-    Int,
-    UnsignedInt,
-    Long,
-    UnsignedLong,
-    Float,
-    Double,
-}
 
 impl fmt::Display for GNCType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -71,6 +56,21 @@ pub enum BinaryOperator {
     LogicalOr,
     FetchRHS,
 }
+
+impl BinaryOperator {
+    pub fn is_compare(&self) -> bool {
+        match self {
+            BinaryOperator::Equal |
+            BinaryOperator::LessThan |
+            BinaryOperator::GreaterThan |
+            BinaryOperator::LessEqual |
+            BinaryOperator::GreaterEqual |
+            BinaryOperator::NotEqual => true,
+            _ => { false }
+        }
+    }
+}
+
 
 #[derive(Debug, Serialize)]
 pub enum AssignOperation {
@@ -627,7 +627,6 @@ fn visit_data_type(pair: Pair<'_, Rule>) -> GNCType {
 fn visit_int_literal(pair: Pair<'_, Rule>) -> GNCAST {
     let literal_rule = pair.into_inner().next().unwrap();
 
-//    println!("{}", literal_rule.as_str());
 
     match literal_rule.as_rule() {
         Rule::bin_literal => {
@@ -642,8 +641,13 @@ fn visit_int_literal(pair: Pair<'_, Rule>) -> GNCAST {
                                               8).unwrap();
             return GNCAST::IntLiteral(literal);
         }
-        Rule::dec_literal |
         Rule::hex_literal => {
+            let literal_str = literal_rule.as_str();
+            let literal = i64::from_str_radix(&literal_str[2..literal_str.len()],
+                                              16).unwrap();
+            return GNCAST::IntLiteral(literal);
+        }
+        Rule::dec_literal => {
             let literal = literal_rule.as_str().to_string().parse::<i64>().unwrap();
             return GNCAST::IntLiteral(literal);
         }

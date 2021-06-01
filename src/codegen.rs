@@ -2,15 +2,17 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use std::path::{Path, PathBuf};
 use std::collections::{HashMap, VecDeque, HashSet};
-use parser::{GNCAST, GNCType, UnaryOperator, BinaryOperator, AssignOperation, GNCParameter};
+use parser::{GNCAST, UnaryOperator, BinaryOperator, AssignOperation, GNCParameter};
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
-use inkwell::{IntPredicate};
+use inkwell::{IntPredicate, FloatPredicate};
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
-use inkwell::values::{PointerValue, IntValue, FunctionValue, BasicValue, BasicValueEnum};
+use inkwell::values::{PointerValue, FunctionValue, BasicValue, BasicValueEnum};
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicTypeEnum, BasicType, FunctionType};
-use checker::GNCErr;
+use checker::{GNCErr};
+use anyhow::Result;
+use types::{GNCType, Type};
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -23,7 +25,7 @@ pub struct CodeGen<'ctx> {
     context: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
-    addr_map_stack: Vec<HashMap<String, PointerValue<'ctx>>>,
+    addr_map_stack: Vec<HashMap<String, (Type<'ctx>, PointerValue<'ctx>)>>,
 
     //>>>>>>>>>>>>>>>>>>>>>>>>
     //      LLVM Blocks
@@ -36,9 +38,9 @@ pub struct CodeGen<'ctx> {
     // continue labels (in loop statements)
     continue_labels: VecDeque<BasicBlock<'ctx>>,
     // hashset for functions
-    function_set: HashSet<String>,
+    function_map: HashMap<String, Option<Type<'ctx>>>,
     // hashset for global variable
-    global_variable_map: HashMap<String, PointerValue<'ctx>>,
+    global_variable_map: HashMap<String, (Type<'ctx>, PointerValue<'ctx>)>,
 }
 
 impl<'ctx> CodeGen<'ctx> {
@@ -50,7 +52,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // set variable scope
         let mut addr_map_stack = Vec::new();
-        let global_map: HashMap<String, PointerValue> = HashMap::new();
+        let global_map: HashMap<String, (Type<'ctx>, PointerValue<'ctx>)> = HashMap::new();
         addr_map_stack.push(global_map); // push global variable hashmap
 
         CodeGen { // return value
@@ -63,26 +65,26 @@ impl<'ctx> CodeGen<'ctx> {
             current_function: None,
             break_labels: VecDeque::new(),
             continue_labels: VecDeque::new(),
-            function_set: HashSet::new(),
+            function_map: HashMap::new(),
             global_variable_map: HashMap::new(),
         }
     }
 
     // generate all code
-    pub fn gen(&mut self, ast: &Vec<GNCAST>) {
+    pub fn gen(&mut self, ast: &Vec<GNCAST>) -> Result<()> {
         // first scan
         for node in ast {
             match node {
                 GNCAST::Function(ref func_type,
                                  ref func_name,
                                  ref func_param, _) => {
-                    self.gen_function_proto(func_type, func_name, func_param);
+                    self.gen_function_proto(func_type, func_name, func_param)?;
                 }
                 GNCAST::GlobalDeclaration(
                     ref var_type,
                     ref var_name,
                     ref ptr_to_init) => {
-                    self.gen_global_variable(var_type, var_name, ptr_to_init);
+                    self.gen_global_variable(var_type, var_name, ptr_to_init)?;
                 }
                 _ => { panic!(); }
             }
@@ -95,7 +97,7 @@ impl<'ctx> CodeGen<'ctx> {
                                  ref func_name,
                                  ref func_param,
                                  ref func_body) => {
-                    self.gen_function_def(func_type, func_name, func_param, func_body);
+                    self.gen_function_def(func_type, func_name, func_param, func_body)?;
                 }
                 _ => {}
             }
@@ -132,6 +134,7 @@ impl<'ctx> CodeGen<'ctx> {
         machine.write_to_file(&self.module,
                               FileType::Assembly,
                               target_assembly_path.as_ref()).unwrap();
+        Ok(())
     }
 
 
@@ -139,51 +142,64 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_global_variable(&mut self,
                            var_type: &GNCType,
                            var_name: &String,
-                           ptr_to_init: &Box<GNCAST>) {
+                           ptr_to_init: &Box<GNCAST>) -> Result<()> {
         if self.global_variable_map.contains_key(var_name) {
-            GNCErr::handle(&GNCErr::DuplicateGlobalVar(var_name.to_string()),
-                           None);
+            let err = GNCErr::DuplicateGlobalVar(var_name.to_string());
+            return Err(err.into());
         }
 
-        let llvm_var_type = self.to_basic_type(var_type);
+        let ty = self.to_basic_type(var_type)?;
 
-        let global_value = self.module.add_global(llvm_var_type,
+        let global_value = self.module.add_global(ty.llvm_ty,
                                                   None,
                                                   var_name.as_str());
 
-
         // TODO add const_val check
-        let init_value = self.gen_expression(&**ptr_to_init);
-        global_value.set_initializer(&init_value);
+        // TODO add type cast
+        let init_val = self.gen_expression(&**ptr_to_init)?;
 
+        global_value.set_initializer(&(init_val.1));
 
         self.global_variable_map.insert(var_name.to_string(),
-                                        global_value.as_pointer_value());
+                                        (ty, global_value.as_pointer_value()));
+        Ok(())
     }
 
 
     // generate function proto
     fn gen_function_proto(&mut self,
-                          func_type: &GNCType,
+                          ret_type: &GNCType,
                           func_name: &String,
-                          func_param: &Vec<GNCParameter>) {
+                          func_param: &Vec<GNCParameter>) -> Result<()> {
+        println!("[DEBUG] generate function protocol");
+
         // cannot handle duplicate function
-        if self.function_set.contains(func_name) {
-            GNCErr::handle(&GNCErr::DuplicateFunction(func_name.to_string()),
-                           None);
+        if self.function_map.contains_key(func_name) {
+            let err = GNCErr::DuplicateFunction(func_name.to_string());
+
+            return Err(err.into());
         }
 
         // function parameter should be added in this llvm_func_type
-        let mut param_types: Vec<BasicTypeEnum> = Vec::new();
+        let mut param_types: Vec<BasicTypeEnum<'ctx>> = Vec::new();
         for param in func_param {
-            param_types.push(self.to_basic_type(&param.param_type));
+            let ty = self.to_basic_type(&param.param_type)?;
+            param_types.push(ty.llvm_ty);
         }
 
-        let llvm_func_type = self.to_return_type(func_type, &param_types);
+        let llvm_func_ty = self.to_return_type(ret_type, &param_types)?;
 
         // create function
-        self.module.add_function(func_name.as_str(), llvm_func_type, None);
-        self.function_set.insert(func_name.to_owned());
+        self.module.add_function(func_name.as_str(), llvm_func_ty, None);
+
+        let func_ty = if *ret_type != GNCType::Void {
+            Some(self.to_basic_type(ret_type)?)
+        } else {
+            None
+        };
+
+        self.function_map.insert(func_name.to_owned(), func_ty);
+        Ok(())
     }
 
 
@@ -191,9 +207,10 @@ impl<'ctx> CodeGen<'ctx> {
                         func_type: &GNCType,
                         func_name: &String,
                         func_param: &Vec<GNCParameter>,
-                        func_body: &Vec<GNCAST>) {
+                        func_body: &Vec<GNCAST>) -> Result<()> {
+        println!("[DEBUG] generate function definition");
         // push local map
-        let local_map: HashMap<String, PointerValue> = HashMap::new();
+        let local_map: HashMap<String, (Type<'ctx>, PointerValue<'ctx>)> = HashMap::new();
         self.addr_map_stack.push(local_map);
 
         let func_option = self.module.get_function(func_name.as_str());
@@ -222,19 +239,20 @@ impl<'ctx> CodeGen<'ctx> {
                 None => builder.position_at_end(func_entry),
             }
 
+            let ty = self.to_basic_type(&func_param[i].param_type)?;
+
             // alloc variable on stack
             let alloca = builder.build_alloca(
-                self.to_basic_type(&func_param[i].param_type),
+                ty.llvm_ty,
                 &arg_name,
             );
-            self.save_ptr_val(&arg_name.to_string(), alloca);
+            self.gen_variable(ty, &arg_name.to_string(), alloca);
         }
 
         // generate IR for statements inside the function body
         for statement in func_body {
-            self.gen_statement(statement);
+            self.gen_statement(statement)?;
         }
-
 
         // build terminator for each non-terminated block
         let mut iter_block = func.get_first_basic_block();
@@ -257,63 +275,71 @@ impl<'ctx> CodeGen<'ctx> {
         }
 
         self.addr_map_stack.pop();
-        self.current_function = None
+        self.current_function = None;
+        Ok(())
     }
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    fn get_point_value(&self, identifier: &String) -> PointerValue {
-        for map in self.addr_map_stack.iter().rev() {
-            let rst = map.get(identifier);
-            if rst.is_some() {
-                return *rst.unwrap();
-            }
-        }
 
-        let global_rst = self.global_variable_map.get(identifier);
-        if global_rst.is_some() {
-            return *global_rst.unwrap();
-        }
-
-        GNCErr::handle(&GNCErr::MissingVariable(identifier.to_string()), None);
-        panic!();
-    }
-
-    fn save_ptr_val(&mut self, identifier: &String, ptr_val: PointerValue<'ctx>) {
+    fn gen_variable(&mut self,
+                    var_type: Type<'ctx>,
+                    identifier: &String,
+                    ptr: PointerValue<'ctx>) {
         match self.addr_map_stack.last_mut() {
             Some(map) => {
-                map.insert(identifier.to_string(), ptr_val);
+                map.insert(identifier.to_string(), (var_type, ptr));
             }
             _ => { panic!(identifier.to_string() + " not found. Addr HashMap Stack overflow"); }
         }
     }
 
-    fn gen_statement(&mut self, statement: &GNCAST) {
+    fn gen_statement(&mut self, statement: &GNCAST) -> Result<()> {
         // println!("in gen_statement {:?}", statement);
         match statement {
             GNCAST::ReturnStatement(ref ptr_to_expr) => {
+                println!("[DEBUG] generate return statement");
+
                 if ptr_to_expr.is_some() {
+                    let func = self.current_function.unwrap();
+
+                    let ty_opt = func.get_type().get_return_type();
+
+                    // return type mismatch
+                    if ty_opt.is_none() {
+                        return Err(GNCErr::ReturnTypeMismatch().into());
+                    }
+
+                    // TODO add type cast
+
+                    let ty = ty_opt.unwrap();
+
                     let expr = ptr_to_expr.as_ref().as_ref().unwrap();
-                    let expr_val = self.gen_expression(&expr);
-                    self.builder.build_return(Some(&expr_val));
+                    let expr_val = self.gen_expression(&expr)?;
+
+                    self.builder.build_return(Some(&expr_val.1));
                 } else {
                     self.builder.build_return(None);
                 }
             }
             GNCAST::Declaration(ref data_type, ref identifier) => {
-                let point_value = self.builder.build_alloca(
-                    self.to_basic_type(data_type),
-                    identifier);
-                self.save_ptr_val(identifier, point_value);
+                println!("[DEBUG] generate declaration");
+                let ty = self.to_basic_type(data_type)?;
+
+                let point_value = self.builder.build_alloca(ty.llvm_ty, identifier);
+                self.gen_variable(ty, identifier, point_value);
             }
             GNCAST::FunctionCall(ref function_name,
                                  ref parameters) => {
-                self.gen_function_call(function_name, parameters);
+                self.gen_function_call(function_name, parameters)?;
             }
             GNCAST::Assignment(ref op,
                                ref identifier,
                                ref expr) => {
+                println!("[DEBUG] generate assignment");
+                let ptr = self.get_variable(identifier)?;
+
                 let val = self.gen_binary_expression(
                     &match op {
                         AssignOperation::Addition => BinaryOperator::Add,
@@ -330,19 +356,22 @@ impl<'ctx> CodeGen<'ctx> {
                     },
                     &Box::new(GNCAST::Identifier(identifier.to_owned())),
                     expr,
-                );
+                )?;
 
-                self.builder.build_store(self.get_point_value(identifier), val);
+                // TODO add type cast
+                // check variable and value type
+
+                self.builder.build_store(ptr.1, val.1);
             }
             GNCAST::IfStatement(ref cond,
                                 ref if_statements,
                                 ref else_statements) => {
-                self.gen_if_statement(cond, if_statements, else_statements);
+                self.gen_if_statement(cond, if_statements, else_statements)?;
             }
             GNCAST::WhileStatement(ref is_do_while,
                                    ref cond,
                                    ref while_statements) => {
-                self.gen_while_statements(*is_do_while, cond, while_statements);
+                self.gen_while_statements(*is_do_while, cond, while_statements)?;
             }
             GNCAST::ContinueStatement => {
                 if self.continue_labels.is_empty() {
@@ -362,75 +391,21 @@ impl<'ctx> CodeGen<'ctx> {
                                  ref cond,
                                  ref step,
                                  ref for_statements) => {
-                self.gen_for_statement(init_clauses,
-                                       cond,
-                                       step,
-                                       for_statements);
+                self.gen_for_statement(init_clauses, cond, step, for_statements)?;
             }
             _ => {
                 panic!("Invalid Statement");
             }
         }
+        Ok(())
     }
 
-
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    fn gen_function_call(&self,
-                         function_name: &String,
-                         parameters: &Vec<GNCAST>) -> IntValue {
-        let func_option = self.module.get_function(function_name);
-        if func_option.is_none() {
-            GNCErr::handle(&GNCErr::MissingFunction(
-                function_name.to_string()), None);
-        }
-
-        let func = func_option.unwrap();
-        let func_param_count = func.get_type().count_param_types();
-
-        // handle calling parameter count mismatch
-        if parameters.len() != func_param_count as usize {
-            GNCErr::handle(&GNCErr::ParameterCountMismatch(
-                function_name.to_string(),
-                func_param_count as usize,
-                parameters.len(),
-            ), None);
-        }
-
-        let mut compiled_args: Vec<BasicValueEnum> =
-            Vec::with_capacity(parameters.len());
-
-
-        for (i, arg) in parameters.iter().enumerate() {
-            let arg_value = self.gen_expression(arg).as_basic_value_enum();
-
-            let func_param = func.get_nth_param(i as u32).unwrap();
-
-            if arg_value.get_type() == func_param.get_type() {
-                compiled_args.push(BasicValueEnum::from(
-                    self.gen_expression(arg)));
-            } else {
-                GNCErr::handle(&GNCErr::ParameterMismatch(), None)
-            }
-        }
-
-        let value = self.builder.build_call(func_option.unwrap(),
-                                            compiled_args.as_slice(),
-                                            "").try_as_basic_value().left();
-
-        if value.is_some() {
-            return value.unwrap().into_int_value();
-        }
-
-        GNCErr::handle(&GNCErr::InvalidFunctionCall(), None);
-        panic!()
-    }
 
     fn gen_for_statement(&mut self,
                          initial_statements: &Vec<GNCAST>,
                          cond: &Box<Option<GNCAST>>,
                          step: &Box<Option<GNCAST>>,
-                         for_statements: &Box<GNCAST>) {
+                         for_statements: &Box<GNCAST>) -> Result<()> {
         let func = self.current_function.unwrap();
 
         let before_block = self.context.append_basic_block(func,
@@ -447,7 +422,7 @@ impl<'ctx> CodeGen<'ctx> {
 
         // generate initial clauses
         for init_clause in initial_statements {
-            self.gen_statement(init_clause);
+            self.gen_statement(init_clause)?;
         }
         self.builder.build_unconditional_branch(before_block);
 
@@ -459,22 +434,23 @@ impl<'ctx> CodeGen<'ctx> {
         if cond_expr.is_none() {
             self.builder.build_unconditional_branch(loop_block);
         } else {
-            let cond_val = self.gen_expression(cond_expr.unwrap());
-            self.builder.build_conditional_branch(cond_val,
+            let cond = self.gen_expression(cond_expr.unwrap())?;
+
+            self.builder.build_conditional_branch(cond.1.into_int_value(),
                                                   loop_block,
                                                   after_block);
         }
 
         // generate for-loop body
         self.builder.position_at_end(loop_block);
-        self.gen_block_statements(for_statements);
+        self.gen_block_statements(for_statements)?;
         self.builder.build_unconditional_branch(step_block);
 
         // generate step-clause
         self.builder.position_at_end(step_block);
         let step_statement = step.as_ref().as_ref();
         if step_statement.is_some() {
-            self.gen_statement(step_statement.unwrap());
+            self.gen_statement(step_statement.unwrap())?;
         }
 
         if self.no_terminator() {
@@ -486,18 +462,20 @@ impl<'ctx> CodeGen<'ctx> {
 
         self.continue_labels.pop_back();
         self.break_labels.pop_back();
+
+        Ok(())
     }
 
 
     // generate if-else statements
     fn gen_if_statement(&mut self, cond: &Box<GNCAST>,
                         if_statements: &Box<GNCAST>,
-                        else_statements: &Box<GNCAST>) {
+                        else_statements: &Box<GNCAST>) -> Result<()> {
         // get current function
         let func = self.current_function.unwrap();
 
         // get condition
-        let cond_val = self.gen_expression(cond);
+        let cond = self.gen_expression(cond)?;
 
         // append 3 blocks
         let if_block = self.context.append_basic_block(func,
@@ -508,24 +486,29 @@ impl<'ctx> CodeGen<'ctx> {
                                                           "merge_block");
 
         // build condition statement
-        self.builder.build_conditional_branch(cond_val, if_block,
+        self.builder.build_conditional_branch(cond.1.into_int_value(),
+                                              if_block,
                                               else_block);
 
         // build if_block
         self.builder.position_at_end(if_block);
-        self.gen_block_statements(if_statements);
+        self.gen_block_statements(if_statements)?;
+
         if self.no_terminator() {
             self.builder.build_unconditional_branch(merge_block);
         }
 
         // build else_block
         self.builder.position_at_end(else_block);
-        self.gen_block_statements(else_statements);
+        self.gen_block_statements(else_statements)?;
+
         if self.no_terminator() {
             self.builder.build_unconditional_branch(merge_block);
         }
 
         self.builder.position_at_end(merge_block);
+
+        Ok(())
     }
 
 
@@ -533,7 +516,9 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_while_statements(&mut self,
                             is_do_while: bool,
                             cond: &Box<GNCAST>,
-                            while_statements: &Box<GNCAST>) {
+                            while_statements: &Box<GNCAST>) -> Result<()> {
+        println!("[DEBUG] generate {} statement", if is_do_while { "do_while" } else { "while" });
+
         let func = self.current_function.unwrap();
 
         let before_block =
@@ -556,25 +541,26 @@ impl<'ctx> CodeGen<'ctx> {
 
         // build before block
         self.builder.position_at_end(before_block);
-        let cond_val = self.gen_expression(cond);
+        let cond_val = self.gen_expression(cond)?;
 
         if is_do_while {
             // build do-while unconditional branch
             self.builder.build_unconditional_branch(while_block);
         } else {
             // build while conditional branch
-            self.builder.build_conditional_branch(cond_val,
+            self.builder.build_conditional_branch(cond_val.1.into_int_value(),
                                                   while_block,
                                                   after_block);
         }
         self.builder.position_at_end(while_block);
 
         // build while block
-        self.gen_block_statements(while_statements);
+        self.gen_block_statements(while_statements)?;
         if self.no_terminator() {
             if is_do_while {
-                let do_while_cond = self.gen_expression(cond);
-                self.builder.build_conditional_branch(do_while_cond,
+                let do_while_cond = self.gen_expression(cond)?;
+
+                self.builder.build_conditional_branch(do_while_cond.1.into_int_value(),
                                                       before_block,
                                                       after_block);
             } else {
@@ -587,19 +573,156 @@ impl<'ctx> CodeGen<'ctx> {
 
         self.break_labels.pop_back();
         self.continue_labels.pop_back();
+
+        Ok(())
     }
 
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    // generate block statement (scope)
+    fn gen_block_statements(&mut self, block: &Box<GNCAST>) -> Result<()> {
+        let local_map: HashMap<String, (Type<'ctx>, PointerValue<'ctx>)>
+            = HashMap::new();
+        self.addr_map_stack.push(local_map);
+
+        match **block {
+            GNCAST::BlockStatement(ref statements) => {
+                for statement in statements {
+                    self.gen_statement(statement)?;
+                }
+            }
+            _ => { panic!() }
+        }
+
+        self.addr_map_stack.pop();
+        Ok(())
+    }
+
+    //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    //      generate expressions (type & value)
+    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+    fn gen_function_call(&self,
+                         function_name: &String,
+                         parameters: &Vec<GNCAST>) -> Result<(Option<Type<'ctx>>,
+                                                              Option<BasicValueEnum<'ctx>>)> {
+        println!("[DEBUG] generate function call");
+
+        // get function and return type
+        let ret_ty_opt = self.function_map.get(function_name);
+        let func_option = self.module.get_function(function_name);
+
+        // handle not found error
+        if ret_ty_opt.is_none() || func_option.is_none() {
+            let err = GNCErr::MissingFunction(function_name.to_string());
+            return Err(err.into());
+        }
+
+        let func = func_option.unwrap();
+        let func_param_count = func.get_type().count_param_types();
+
+        // handle calling parameter count mismatch
+        if parameters.len() != func_param_count as usize {
+            let err = GNCErr::ParameterCountMismatch(
+                function_name.to_string(),
+                func_param_count as usize,
+                parameters.len());
+            return Err(err.into());
+        }
+
+        // prepare function call arguments
+        let mut compiled_args: Vec<BasicValueEnum> =
+            Vec::with_capacity(parameters.len());
+
+
+        for (i, arg) in parameters.iter().enumerate() {
+            let func_param = func.get_nth_param(i as u32).unwrap().get_type();
+
+            let arg_val = self.gen_expression(arg)?;
+
+
+            compiled_args.push(arg_val.1);
+        }
+
+        let value = self.builder.build_call(func_option.unwrap(),
+                                            compiled_args.as_slice(),
+                                            "").try_as_basic_value().left();
+
+
+        let ret_ty = *ret_ty_opt.unwrap();
+
+        // TODO fix function call
+
+        if (ret_ty.is_some() && value.is_some()) || (ret_ty.is_none() && value.is_none()) {
+            Ok((ret_ty, value))
+        } else {
+            let err = GNCErr::InvalidFunctionCall();
+            return Err(err.into());
+        }
+    }
 
     // generate expressions
-    fn gen_expression(&self, expression: &GNCAST) -> IntValue {
+    fn gen_expression(&self, expression: &GNCAST)
+                      -> Result<(Type<'ctx>, BasicValueEnum<'ctx>)> {
         match expression {
             GNCAST::Identifier(ref identifier) => {
-                self.gen_identifier(identifier)
+                self.gen_deref_variable(identifier)
+            }
+            GNCAST::BoolLiteral(ref bool_literal) => {
+                Ok((Type {
+                    ty: GNCType::Bool,
+                    llvm_ty: self.context.bool_type().as_basic_type_enum(),
+                }, self.context.bool_type().const_int(*bool_literal as u64,
+                                                      false).as_basic_value_enum()))
             }
             GNCAST::IntLiteral(ref int_literal) => {
-                return self.context.i32_type().const_int(*int_literal as u64,
-                                                         true);
+                let v = *int_literal;
+
+                let ty = if v == 0 || v == 1 {
+                    Type {
+                        ty: GNCType::Bool,
+                        llvm_ty: self.context.bool_type().as_basic_type_enum(),
+                    }
+                } else if v >= i8::MIN as i64 && v <= i8::MAX as i64 {
+                    Type {
+                        ty: GNCType::Byte,
+                        llvm_ty: self.context.i8_type().as_basic_type_enum(),
+                    }
+                } else if v >= i16::MIN as i64 && v <= i16::MAX as i64 {
+                    Type {
+                        ty: GNCType::Short,
+                        llvm_ty: self.context.i16_type().as_basic_type_enum(),
+                    }
+                } else if v >= i32::MIN as i64 && v <= i32::MAX as i64 {
+                    Type {
+                        ty: GNCType::Int,
+                        llvm_ty: self.context.i32_type().as_basic_type_enum(),
+                    }
+                } else {
+                    Type {
+                        ty: GNCType::Long,
+                        llvm_ty: self.context.i64_type().as_basic_type_enum(),
+                    }
+                };
+                Ok((ty, ty.llvm_ty.into_int_type()
+                    .const_int(v as u64, true).as_basic_value_enum()))
+            }
+            GNCAST::FloatLiteral(ref float_literal) => {
+                let v = *float_literal;
+
+                let ty = if v >= f32::MIN as f64 && v <= f32::MAX as f64 {
+                    Type {
+                        ty: GNCType::Float,
+                        llvm_ty: self.context.f32_type().as_basic_type_enum(),
+                    }
+                } else {
+                    Type {
+                        ty: GNCType::Double,
+                        llvm_ty: self.context.f64_type().as_basic_type_enum(),
+                    }
+                };
+
+                Ok((ty, ty.llvm_ty.into_float_type().const_float(v).as_basic_value_enum()))
             }
             GNCAST::UnaryExpression(ref op, ref expr) => {
                 self.gen_unary_expression(op, expr)
@@ -611,7 +734,14 @@ impl<'ctx> CodeGen<'ctx> {
             }
             GNCAST::FunctionCall(ref function_name,
                                  ref parameters) => {
-                self.gen_function_call(function_name, parameters)
+                let call_opt = self.gen_function_call(function_name, parameters)?;
+
+                if call_opt.0.is_some() && call_opt.1.is_some() {
+                    Ok((call_opt.0.unwrap(), call_opt.1.unwrap()))
+                } else {
+                    let err = GNCErr::ReturnTypeMismatch();
+                    return Err(err.into());
+                }
             }
             _ => { panic!("Invalid Expression Type") }
         }
@@ -619,101 +749,249 @@ impl<'ctx> CodeGen<'ctx> {
 
 
     // generate identifier and fetch value
-    fn gen_identifier(&self, identifier: &String) -> IntValue {
-        return self.builder.build_load(self.get_point_value(identifier), "load_val")
-            .into_int_value();
+    fn gen_deref_variable(&self, identifier: &String)
+                          -> Result<(Type<'ctx>, BasicValueEnum<'ctx>)> {
+        let deref = self.get_variable(identifier)?;
+
+        let val = self.builder.build_load(deref.1, "load val");
+        Ok((deref.0, val))
+    }
+
+
+    fn get_variable(&self, identifier: &String) -> Result<(Type<'ctx>, PointerValue<'ctx>)> {
+        let mut lookup_rst = None;
+
+        for map in self.addr_map_stack.iter().rev() {
+            let rst = map.get(identifier);
+            if rst.is_some() {
+                lookup_rst = rst;
+                break;
+            }
+        }
+
+        if lookup_rst.is_none() {
+            lookup_rst = self.global_variable_map.get(identifier);
+        }
+
+        if lookup_rst.is_none() {
+            let err = GNCErr::MissingVariable(identifier.to_string());
+            Err(err.into())
+        } else {
+            Ok(*(lookup_rst.unwrap()))
+        }
     }
 
 
     // generate unary expressions
-    fn gen_unary_expression(&self, op: &UnaryOperator, expr: &Box<GNCAST>) -> IntValue {
+    fn gen_unary_expression(&self,
+                            op: &UnaryOperator,
+                            expr: &Box<GNCAST>)
+                            -> Result<(Type<'ctx>, BasicValueEnum<'ctx>)> {
+        println!("[DEBUG] generate unary expression");
+
+        // generate result
+        let pair = self.gen_expression(expr)?;
+
+        let ty = pair.0;
+        let v = pair.1;
+
         return match op {
             UnaryOperator::UnaryMinus => {
-                self.builder.build_int_neg(self.gen_expression(&*expr),
-                                           "building neg")
+                match ty.ty {
+                    GNCType::Bool |
+                    GNCType::Byte |
+                    GNCType::Short |
+                    GNCType::Int |
+                    GNCType::Long => {
+                        Ok((ty, self.builder.build_int_neg(
+                            v.into_int_value(),
+                            "int neg").as_basic_value_enum()))
+                    }
+                    GNCType::Float |
+                    GNCType::Double => {
+                        Ok((ty, self.builder.build_float_neg(
+                            v.into_float_value(),
+                            "float neg").as_basic_value_enum(),
+                        ))
+                    }
+                    _ => { Err(GNCErr::InvalidUnary().into()) }
+                }
             }
             UnaryOperator::LogicalNot => {
-                let res = self.builder.build_int_compare(
-                    IntPredicate::EQ,
-                    self.context.i32_type().const_int(0 as u64, true),
-                    self.gen_expression(&*expr), "build logical not");
+                match ty.ty {
+                    GNCType::Bool |
+                    GNCType::Byte |
+                    GNCType::Short |
+                    GNCType::Int |
+                    GNCType::Long => {
+                        let res = self.builder.build_int_compare(
+                            IntPredicate::EQ,
+                            ty.llvm_ty.into_int_type().const_int(0 as u64, true),
+                            v.into_int_value(), "int logical not");
 
-                let res = self.builder.build_int_cast(res,
-                                                      self.context.i32_type(),
-                                                      "logical not casting");
-                let res = self.builder.build_int_sub(self.context.i32_type().const_int(0 as u64, true), res, "logical not");
-                res
+                        let ret_ty = Type {
+                            ty: GNCType::Bool,
+                            llvm_ty: self.context.bool_type().as_basic_type_enum(),
+                        };
+
+                        let res = self.builder.build_int_cast(res,
+                                                              ret_ty.llvm_ty.into_int_type(),
+                                                              "logical not casting");
+                        Ok((ret_ty, res.as_basic_value_enum()))
+                    }
+                    _ => { Err(GNCErr::InvalidUnary().into()) }
+                }
             }
             UnaryOperator::BitwiseComplement => {
-                let res = self.builder.build_not(self.gen_expression(&*expr), "build not");
-                res
+                match ty.ty {
+                    GNCType::Bool |
+                    GNCType::Byte |
+                    GNCType::Short |
+                    GNCType::Int |
+                    GNCType::Long => {
+                        Ok((ty, self.builder.build_not(
+                            v.into_int_value(),
+                            "not").as_basic_value_enum()))
+                    }
+                    _ => { Err(GNCErr::InvalidUnary().into()) }
+                }
             }
         };
     }
 
     // generate binary expression
-    fn gen_binary_expression(&self, op: &BinaryOperator, lhs: &Box<GNCAST>, rhs: &Box<GNCAST>) -> IntValue {
-        let lhs_v = self.gen_expression(lhs);
-        let rhs_v = self.gen_expression(rhs);
-        match op {
-            BinaryOperator::Add => self.builder.build_int_add(lhs_v, rhs_v, "i32 add"),
-            BinaryOperator::Subtract => self.builder.build_int_sub(lhs_v, rhs_v, "i32 sub"),
-            BinaryOperator::Multiply => self.builder.build_int_mul(lhs_v, rhs_v, "i32 mul"),
-            BinaryOperator::Divide => self.builder.build_int_signed_div(lhs_v, rhs_v, "i32 signed div"),
-            BinaryOperator::Modulus => self.builder.build_int_signed_rem(lhs_v, rhs_v, "mod"),
-            BinaryOperator::ShiftRight => self.builder.build_right_shift(lhs_v, rhs_v, true, "shr"),
-            BinaryOperator::ShiftLeft => self.builder.build_left_shift(lhs_v, rhs_v, "shl"),
-            BinaryOperator::NotEqual => self.builder.build_int_compare(IntPredicate::NE, lhs_v, rhs_v, "ne"),
-            BinaryOperator::Equal => self.builder.build_int_compare(IntPredicate::EQ, lhs_v, rhs_v, "eq"),
-            BinaryOperator::GreaterThan => self.builder.build_int_compare(IntPredicate::SGT, lhs_v, rhs_v, "gt"),
-            BinaryOperator::GreaterEqual => self.builder.build_int_compare(IntPredicate::SGE, lhs_v, rhs_v, "ge"),
-            BinaryOperator::LessThan => self.builder.build_int_compare(IntPredicate::SLT, lhs_v, rhs_v, "lt"),
-            BinaryOperator::LessEqual => self.builder.build_int_compare(IntPredicate::SLE, lhs_v, rhs_v, "le"),
-            BinaryOperator::BitwiseAnd => self.builder.build_and(lhs_v, rhs_v, "and"),
-            BinaryOperator::ExclusiveOr => self.builder.build_xor(lhs_v, rhs_v, "xor"),
-            BinaryOperator::InclusiveOr => self.builder.build_or(lhs_v, rhs_v, "or"),
-            BinaryOperator::LogicalAnd => self.builder.build_and(
-                self.builder.build_int_cast(lhs_v, self.context.bool_type(), "cast i32 to i1"),
-                self.builder.build_int_cast(rhs_v, self.context.bool_type(), "cast i32 to i1"),
-                "logical and",
-            ),
-            BinaryOperator::LogicalOr => self.builder.build_or(
-                self.builder.build_int_cast(lhs_v, self.context.bool_type(), "cast i32 to i1"),
-                self.builder.build_int_cast(rhs_v, self.context.bool_type(), "cast i32 to i1"),
-                "logical or",
-            ),
-            BinaryOperator::FetchRHS => rhs_v
-        }
-    }
+    fn gen_binary_expression(&self,
+                             op: &BinaryOperator,
+                             lhs: &Box<GNCAST>,
+                             rhs: &Box<GNCAST>)
+                             -> Result<(Type<'ctx>, BasicValueEnum<'ctx>)> {
+        println!("[DEBUG] generate binary expression");
 
+        // generate (type, value) pair
+        let lhs_pair = self.gen_expression(lhs)?;
+        let rhs_pair = self.gen_expression(rhs)?;
 
-//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        // lhs (type, value)
+        let lhs_ty = lhs_pair.0;
+        let lhs_v = lhs_pair.1;
 
+        // rhs (type, value)
+        let rhs_ty = rhs_pair.0;
+        let rhs_v = rhs_pair.1;
 
-    fn gen_block_statements(&mut self, block: &Box<GNCAST>) {
-        let local_map: HashMap<String, PointerValue> = HashMap::new();
-        self.addr_map_stack.push(local_map);
+        // TODO default upcast
+        
+        match rhs_ty {
+            Type::IntType(_) => {
+                let int_lhs_v = lhs_v.into_int_value();
+                let int_rhs_v = rhs_v.into_int_value();
 
-        match **block {
-            GNCAST::BlockStatement(ref statements) => {
-                for statement in statements {
-                    self.gen_statement(statement);
+                let int_val = match op {
+                    BinaryOperator::Add => self.builder.build_int_add(int_lhs_v, int_rhs_v, "int add"),
+                    BinaryOperator::Subtract => self.builder.build_int_sub(int_lhs_v, int_rhs_v, "int sub"),
+                    BinaryOperator::Multiply => self.builder.build_int_mul(int_lhs_v, int_rhs_v, "int mul"),
+                    BinaryOperator::Divide => self.builder.build_int_signed_div(int_lhs_v, int_rhs_v, "i32 signed div"),
+                    BinaryOperator::Modulus => self.builder.build_int_signed_rem(int_lhs_v, int_rhs_v, "mod"),
+                    BinaryOperator::ShiftRight => self.builder.build_right_shift(int_lhs_v, int_rhs_v, true, "shr"),
+                    BinaryOperator::ShiftLeft => self.builder.build_left_shift(int_lhs_v, int_rhs_v, "shl"),
+                    BinaryOperator::NotEqual => self.builder.build_int_compare(IntPredicate::NE, int_lhs_v, int_rhs_v, "ne"),
+                    BinaryOperator::Equal => self.builder.build_int_compare(IntPredicate::EQ, int_lhs_v, int_rhs_v, "eq"),
+                    BinaryOperator::GreaterThan => self.builder.build_int_compare(IntPredicate::SGT, int_lhs_v, int_rhs_v, "gt"),
+                    BinaryOperator::GreaterEqual => self.builder.build_int_compare(IntPredicate::SGE, int_lhs_v, int_rhs_v, "ge"),
+                    BinaryOperator::LessThan => self.builder.build_int_compare(IntPredicate::SLT, int_lhs_v, int_rhs_v, "lt"),
+                    BinaryOperator::LessEqual => self.builder.build_int_compare(IntPredicate::SLE, int_lhs_v, int_rhs_v, "le"),
+                    BinaryOperator::BitwiseAnd => self.builder.build_and(int_lhs_v, int_rhs_v, "and"),
+                    BinaryOperator::ExclusiveOr => self.builder.build_xor(int_lhs_v, int_rhs_v, "xor"),
+                    BinaryOperator::InclusiveOr => self.builder.build_or(int_lhs_v, int_rhs_v, "or"),
+                    BinaryOperator::LogicalAnd => self.builder.build_and(
+                        self.builder.build_int_cast(int_lhs_v, self.context.bool_type(), "cast i32 to i1"),
+                        self.builder.build_int_cast(int_rhs_v, self.context.bool_type(), "cast i32 to i1"),
+                        "logical and",
+                    ),
+                    BinaryOperator::LogicalOr => self.builder.build_or(
+                        self.builder.build_int_cast(int_lhs_v, self.context.bool_type(), "cast i32 to i1"),
+                        self.builder.build_int_cast(int_rhs_v, self.context.bool_type(), "cast i32 to i1"),
+                        "logical or",
+                    ),
+                    BinaryOperator::FetchRHS => int_rhs_v
+                };
+                Ok((rhs_ty, int_val.as_basic_value_enum()))
+            }
+            Type::FloatType(_) => {
+                let fp_lhs_v = lhs_v.into_float_value();
+                let fp_rhs_v = rhs_v.into_float_value();
+
+                if op.is_compare() {
+                    let cmp_val = match op {
+                        BinaryOperator::Equal => Some(self.builder
+                            .build_float_compare(FloatPredicate::OEQ,
+                                                 fp_lhs_v, fp_rhs_v, "fp eq")),
+                        BinaryOperator::NotEqual => Some(self.builder
+                            .build_float_compare(FloatPredicate::ONE,
+                                                 fp_lhs_v, fp_rhs_v, "fp ne")),
+                        BinaryOperator::LessThan => Some(self.builder
+                            .build_float_compare(FloatPredicate::OLT,
+                                                 fp_lhs_v, fp_rhs_v, "fp lt")),
+                        BinaryOperator::LessEqual => Some(self.builder
+                            .build_float_compare(FloatPredicate::OLE,
+                                                 fp_lhs_v, fp_rhs_v, "fp lt")),
+                        BinaryOperator::GreaterThan => Some(self.builder
+                            .build_float_compare(FloatPredicate::OGT,
+                                                 fp_lhs_v, fp_rhs_v, "fp lt")),
+                        BinaryOperator::GreaterEqual => Some(self.builder
+                            .build_float_compare(FloatPredicate::OGE,
+                                                 fp_lhs_v, fp_rhs_v, "fp lt")),
+                        _ => { panic!() }
+                    };
+
+                    return Ok((Type {
+                        ty: GNCType::Bool,
+                        llvm_ty: self.context.bool_type().as_basic_type_enum(),
+                    }, cmp_val.unwrap().as_basic_value_enum()));
+                } else {
+                    let fp_val = match op {
+                        BinaryOperator::Add => Some(self.builder
+                            .build_float_add(fp_lhs_v, fp_rhs_v, "fp add")),
+                        BinaryOperator::Subtract => Some(self.builder
+                            .build_float_sub(fp_lhs_v, fp_rhs_v, "fp sub")),
+                        BinaryOperator::Multiply => Some(self.builder
+                            .build_float_mul(fp_lhs_v, fp_rhs_v, "fp mul")),
+                        BinaryOperator::Divide => Some(self.builder
+                            .build_float_div(fp_lhs_v, fp_rhs_v, "fp div")),
+                        BinaryOperator::Modulus => Some(self.builder
+                            .build_float_rem(fp_lhs_v, fp_rhs_v, "fp mod")),
+                        BinaryOperator::FetchRHS => Some(fp_rhs_v),
+                        _ => { None }
+                    };
+
+                    if fp_val.is_some() {
+                        Ok((rhs_ty, fp_val.unwrap().as_basic_value_enum()))
+                    } else {
+                        let err = GNCErr::InvalidFloatingPointOperation();
+                        return Err(err.into());
+                    }
                 }
             }
             _ => { panic!() }
         }
-
-        self.addr_map_stack.pop();
     }
 
+
+    //>>>>>>>>>>>>>>>>>>>>>>>
+    //      Some utils
+    //<<<<<<<<<<<<<<<<<<<<<<<
+
+
+    // check if a basic block has no terminator
     fn no_terminator(&self) -> bool {
         let block = self.builder.get_insert_block();
         let terminator = block.unwrap().get_terminator();
         return terminator.is_none();
     }
 
-    fn to_basic_type(&self, in_type: &GNCType) -> BasicTypeEnum<'ctx> {
-        match in_type {
+    fn to_basic_type(&self, in_type: &GNCType)
+                     -> Result<Type<'ctx>> {
+        let basic_ty = match in_type {
             GNCType::Bool => self.context.bool_type().as_basic_type_enum(),
             GNCType::Byte => self.context.i8_type().as_basic_type_enum(),
             GNCType::UnsignedByte => self.context.i8_type().as_basic_type_enum(),
@@ -726,20 +1004,28 @@ impl<'ctx> CodeGen<'ctx> {
             GNCType::Float => self.context.f32_type().as_basic_type_enum(),
             GNCType::Double => self.context.f64_type().as_basic_type_enum(),
             _ => {
-                GNCErr::handle(&GNCErr::InvalidType(*in_type), None);
-                panic!()
+                let err = GNCErr::InvalidType(*in_type);
+                return Err(err.into());
             }
-        }
+        };
+
+        return Ok(Type {
+            ty: *in_type,
+            llvm_ty: basic_ty,
+        });
     }
 
 
     // add void type as return type
     fn to_return_type(&self,
                       in_type: &GNCType,
-                      param_types: &Vec<BasicTypeEnum<'ctx>>) -> FunctionType<'ctx> {
+                      param_types: &Vec<BasicTypeEnum<'ctx>>) -> Result<FunctionType<'ctx>> {
         match in_type {
-            GNCType::Void => self.context.void_type().fn_type(param_types, false),
-            _ => self.to_basic_type(in_type).fn_type(param_types, false),
+            GNCType::Void => Ok(self.context.void_type().fn_type(param_types, false)),
+            _ => {
+                let basic_type = self.to_basic_type(in_type)?;
+                Ok(basic_type.fn_type(param_types, false))
+            }
         }
     }
 }
