@@ -1,22 +1,28 @@
 {
-  "id": "1",
+  "id": "0",
   "label": "GNC",
   "children": [
     {
-      "id": "2",
-      "label": "Function\nInt\nmain",
+      "id": "1",
+      "label": "Function",
+      "tip": {
+        "functionName": "main",
+        "returnType": "Int",
+        "parameters": []
+      },
       "children": [
         {
-          "id": "3",
-          "label": "Parameter"
-        },
-        {
-          "id": "4",
+          "id": "2",
           "label": "ReturnStatement",
+          "tip": {},
           "children": [
             {
-              "id": "5",
-              "label": "IntLiteral 0"
+              "id": "3",
+              "label": "IntLiteral",
+              "tip": {
+                "value": 0
+              },
+              "children": []
             }
           ]
         }
