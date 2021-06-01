@@ -46,9 +46,18 @@ function App() {
     const [code, editCode] = useState(InitialCode)
     const [parseTree, setParseTree] = useState(mockASTData)
 
+    const astToVisTree = (ast) => {
+
+    }
+
     const compile = () => {
         let data = JSON.parse(compile_result(code))
-        setParseTree(data['parse_tree'])
+        if (!data.error) {
+            setParseTree(data['parse_tree'])
+            console.log(data['ast'])
+        } else {
+            alert(data['error_message']) // TODO: Use Modal
+        }
     }
 
     return (
