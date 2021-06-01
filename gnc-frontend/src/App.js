@@ -46,10 +46,6 @@ function App() {
     const [code, editCode] = useState(InitialCode)
     const [parseTree, setParseTree] = useState(mockASTData)
 
-    const astToVisTree = (ast) => {
-
-    }
-
     const compile = () => {
         let data = JSON.parse(compile_result(code))
         if (!data.error) {
