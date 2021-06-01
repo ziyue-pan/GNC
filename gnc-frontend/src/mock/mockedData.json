@@ -1,0 +1,125 @@
+{
+  "id": "0",
+  "label": "GNC",
+  "attrs": {
+    "remark": "AST Root Node"
+  },
+  "children": [
+    {
+      "id": "1",
+      "label": "Function",
+      "attrs": {
+        "functionName": "main",
+        "returnType": "Int",
+        "parameters": "[\n  {\n    \"param_type\": \"Int\",\n    \"param_name\": \"a\"\n  }\n]"
+      },
+      "children": [
+        {
+          "id": "3",
+          "label": "Declaration",
+          "attrs": {
+            "type": "Int",
+            "name": "b"
+          },
+          "children": []
+        },
+        {
+          "id": "4",
+          "label": "Assignment",
+          "attrs": {
+            "assignOperation": "Simple",
+            "leftValue": "b"
+          },
+          "children": [
+            {
+              "id": "5",
+              "label": "IntLiteral",
+              "attrs": {
+                "value": 3
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "6",
+          "label": "IfStatement",
+          "attrs": {},
+          "children": [
+            {
+              "id": "7",
+              "label": "BinaryExpression",
+              "attrs": {
+                "binaryOperator": "Equal"
+              },
+              "children": [
+                {
+                  "id": "8",
+                  "label": "Identifier",
+                  "attrs": {
+                    "name": "a"
+                  },
+                  "children": []
+                },
+                {
+                  "id": "9",
+                  "label": "IntLiteral",
+                  "attrs": {
+                    "value": 0
+                  },
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "10",
+              "label": "BlockStatement",
+              "attrs": {},
+              "children": [
+                {
+                  "id": "11",
+                  "label": "Assignment",
+                  "attrs": {
+                    "assignOperation": "Addition",
+                    "leftValue": "a"
+                  },
+                  "children": [
+                    {
+                      "id": "12",
+                      "label": "Identifier",
+                      "attrs": {
+                        "name": "b"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "13",
+              "label": "BlockStatement",
+              "attrs": {},
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "14",
+          "label": "ReturnStatement",
+          "attrs": {},
+          "children": [
+            {
+              "id": "15",
+              "label": "Identifier",
+              "attrs": {
+                "name": "a"
+              },
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -10,7 +10,7 @@ const CardItem = styled.div.attrs({
     className: "flex flex-auto w-full h-full bg-white rounded-xl shadow-md overflow-hidden"
 })``;
 
-export function Card(props) {
+export default function Card(props) {
     return (
         <CardContainer>
             <CardItem>

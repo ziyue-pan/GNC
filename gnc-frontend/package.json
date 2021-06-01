@@ -4,6 +4,8 @@
   "private": true,
   "dependencies": {
     "@antv/g6": "^4.3.0",
+    "@headlessui/react": "^1.2.0",
+    "@heroicons/react": "^1.0.1",
     "@monaco-editor/react": "^4.1.3",
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
