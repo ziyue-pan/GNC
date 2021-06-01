@@ -111,7 +111,7 @@ export default function AntVTree(props) {
             tmp_graph.data(props.data);
             tmp_graph.render();
             tmp_graph.fitView();
-            setGraph(tmp_graph)
+            setGraph(tmp_graph);
         } else {
             graph.data(props.data);
             graph.render();
