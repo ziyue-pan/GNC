@@ -14,14 +14,14 @@ const node2tree = (astNode) => {
             }
             switch (x) {
                 case "Function":
-                    const [retType, funcName, parameters, children] = node[x]
+                    const [retType, funcName, parameters, funcChildren] = node[x]
                     id += 1
                     treeNode.attrs = {
                         functionName: funcName,
                         returnType: retType,
                         parameters
                     }
-                    treeNode.children = node2tree(children)
+                    treeNode.children = node2tree(funcChildren)
                     break
                 case "ReturnStatement":
                     treeNode.children = node2tree([node[x]])
@@ -30,6 +30,33 @@ const node2tree = (astNode) => {
                     treeNode.attrs = {
                         value: node[x]
                     }
+                    break
+                case "Declaration":
+                    const [type, name] = node[x]
+                    treeNode.attrs = {
+                        type,
+                        name
+                    }
+                    break
+                case "Assignment":
+                    const [assignOperation, leftValue, assignChildren] = node[x]
+                    treeNode.attrs = {
+                        assignOperation,
+                        leftValue
+                    }
+                    treeNode.children = node2tree([assignChildren])
+                    break
+                case "Identifier":
+                    treeNode.attrs = {
+                        name: node[x]
+                    }
+                    break
+                case "BinaryExpression":
+                    const [binaryOperator, lhs, rhs] = node[x]
+                    treeNode.attrs = {
+                        binaryOperator
+                    }
+                    treeNode.children = node2tree([lhs, rhs])
                     break
                 default:
                     console.log(x)
@@ -50,4 +77,5 @@ let tree = {
     children: node2tree(ast)
 }
 
-console.log(JSON.stringify(tree, null, 2))
+// console.log(JSON.stringify(tree, null, 2))
+// console.log(JSON.stringify(tree))
