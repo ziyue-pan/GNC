@@ -2,9 +2,11 @@ on:
   push:
     branches:
       - main
+      - dev
   pull_request:
     branches:
       - main
+      - dev
 
 name: CI
 
@@ -28,10 +30,10 @@ jobs:
         directory: ${{ runner.temp }}/llvm
 
     - name: Build
-      run: cargo build --features web
+      run: cargo build --features web --package GNC --bin GNC
 
     - name: Test Compilation
-      run: cargo test --package GNC --bin GNC tests::test_compile --features web
+      run: cargo test --package GNC --bin GNC tests::test_compile --features web -- --exact --nocapture 
 
     # - name: Test Correctness
       
