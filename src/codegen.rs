@@ -155,10 +155,12 @@ impl<'ctx> CodeGen<'ctx> {
                                                   var_name.as_str());
 
         // TODO add const_val check
-        // TODO add type cast
-        let init_val = self.gen_expression(&**ptr_to_init)?;
 
-        global_value.set_initializer(&(init_val.1));
+        let init_val_pair = self.gen_expression(&**ptr_to_init)?;
+        let cast_ty = Type::cast(&init_val_pair.0, &ty)?;
+        let cast_v = self.cast_value(&init_val_pair.0, &init_val_pair.1, &cast_ty)?;
+
+        global_value.set_initializer(&cast_v);
 
         self.global_variable_map.insert(var_name.to_string(),
                                         (ty, global_value.as_pointer_value()));
@@ -308,20 +310,21 @@ impl<'ctx> CodeGen<'ctx> {
                 if ptr_to_expr.is_some() {
                     let func_pair = self.current_function.unwrap();
 
-                    let ty_opt = func_pair.1;
+                    let ret_ty_opt = func_pair.1;
 
                     // return type mismatch
-                    if ty_opt.is_none() {
+                    if ret_ty_opt.is_none() {
                         return Err(GNCErr::ReturnTypeMismatch().into());
                     }
 
-                    // TODO add type cast
-                    let ty = ty_opt.unwrap();
-
+                    // get return type and expr metadata
+                    let ret_ty = ret_ty_opt.unwrap();
                     let expr = ptr_to_expr.as_ref().as_ref().unwrap();
                     let expr_pair = self.gen_expression(&expr)?;
 
-                    let ret_val = self.cast_value(&expr_pair.0, &expr_pair.1, &ty)?;
+                    // cast metadata
+                    let cast_ty = Type::cast(&expr_pair.0, &ret_ty)?;
+                    let ret_val = self.cast_value(&expr_pair.0, &expr_pair.1, &cast_ty)?;
 
                     self.builder.build_return(Some(&ret_val));
                 } else {
@@ -343,9 +346,9 @@ impl<'ctx> CodeGen<'ctx> {
                                ref identifier,
                                ref expr) => {
 //                println!("[DEBUG] generate assignment");
-                let ptr = self.get_variable(identifier)?;
+                let ptr_pair = self.get_variable(identifier)?;
 
-                let val = self.gen_binary_expression(
+                let val_pair = self.gen_binary_expression(
                     &match op {
                         AssignOperation::Addition => BinaryOperator::Add,
                         AssignOperation::BitwiseAnd => BinaryOperator::BitwiseAnd,
@@ -363,10 +366,11 @@ impl<'ctx> CodeGen<'ctx> {
                     expr,
                 )?;
 
-                // TODO add type cast
-                // check variable and value type
+                // cast
+                let cast_ty = Type::cast(&val_pair.0, &ptr_pair.0)?;
+                let cast_v = self.cast_value(&val_pair.0, &val_pair.1, &cast_ty)?;
 
-                self.builder.build_store(ptr.1, val.1);
+                self.builder.build_store(ptr_pair.1, cast_v);
             }
             GNCAST::IfStatement(ref cond,
                                 ref if_statements,
@@ -645,15 +649,12 @@ impl<'ctx> CodeGen<'ctx> {
         let param_types = func_ty_pair.1.to_owned();
 
         for (i, arg) in parameters.iter().enumerate() {
-            // TODO generate type cast
             let param_ty = *param_types.get(i).unwrap();
-
             let arg_pair = self.gen_expression(arg)?;
 
+            //  type cast
             let cast_ty = Type::cast(&arg_pair.0, &param_ty)?;
-
-            let cast_v = self.cast_value(&arg_pair.0,
-                                         &arg_pair.1, &param_ty)?;
+            let cast_v = self.cast_value(&arg_pair.0, &arg_pair.1, &cast_ty)?;
 
             compiled_args.push(cast_v);
         }
@@ -885,7 +886,7 @@ impl<'ctx> CodeGen<'ctx> {
         // rhs (type, value)
         let rhs_ty = rhs_pair.0;
 
-        // TODO default upcast
+        // default upcast
         let cast_ty = Type::binary_cast(&lhs_ty, &rhs_ty)?;
 
         let lhs_v = self.cast_value(&lhs_ty, &lhs_pair.1, &cast_ty)?;

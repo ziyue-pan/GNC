@@ -609,7 +609,6 @@ fn visit_data_type(pair: Pair<'_, Rule>) -> GNCType {
     }
 }
 
-// TODO add more literal
 
 //>>>>>>>>>>>>>>>>>>
 //      literals

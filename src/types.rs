@@ -54,7 +54,7 @@ impl<'ctx> Type<'ctx> {
         }
     }
 
-    // binary cast
+    // binary cast (used in binary expression)
     pub fn binary_cast(
         lhs_ty: &Type<'ctx>,
         rhs_ty: &Type<'ctx>,
@@ -76,10 +76,12 @@ impl<'ctx> Type<'ctx> {
     }
 
 
+    // cast
     pub fn cast(
         cur_ty: &Type<'ctx>,
         cast_ty: &Type<'ctx>,
     ) -> Result<Type<'ctx>> {
+        // same type, directly cast
         if cur_ty.ty == cast_ty.ty {
             return Ok(*cast_ty);
         }
