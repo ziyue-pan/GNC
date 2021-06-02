@@ -1,7 +1,6 @@
 use pest::iterators::{Pair};
-use serde::{Serialize};
 use types::GNCType;
-
+use serde::{Serialize};
 
 
 #[derive(Parser, Serialize)]
