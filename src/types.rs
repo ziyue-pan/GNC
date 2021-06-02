@@ -1,6 +1,9 @@
+#[cfg(local)]
 use inkwell::types::{BasicTypeEnum};
 use serde::{Serialize};
+#[cfg(local)]
 use anyhow::Result;
+#[cfg(local)]
 use checker::GNCErr;
 use std::fmt;
 
@@ -27,14 +30,14 @@ impl fmt::Display for GNCType {
     }
 }
 
-
+#[cfg(local)]
 #[derive(Clone, Copy)]
 pub struct Type<'ctx> {
     pub ty: GNCType,
     pub llvm_ty: BasicTypeEnum<'ctx>,
 }
 
-
+#[cfg(local)]
 impl<'ctx> Type<'ctx> {
     // get upcast priority
     fn priority(&self) -> i32 {

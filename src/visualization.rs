@@ -13,6 +13,7 @@ use pest::iterators::Pair;
 use parser::GNCAST;
 
 mod parser;
+mod types;
 
 #[derive(Debug, Serialize)]
 struct VisTreeNode {
