@@ -20,6 +20,7 @@ use pest::Parser;
 use clap::{App, Arg};
 use inkwell::context::Context;
 use colored::Colorize;
+use std::process;
 
 mod types;
 mod parser;
@@ -50,7 +51,10 @@ fn parse_file(file_path: &str) {
 
     match gen_rst {
         Ok(_) => {}
-        Err(err) => { panic!("{}", err); }
+        Err(err) => {
+            println!("{} {}", "[ERROR]".red().bold(), err);
+            process::exit(1);
+        }
     }
 
     // generate llvm-ir code
@@ -68,6 +72,8 @@ fn parse_file(file_path: &str) {
     if !gen_rv64_output.status.success() {
         panic!("{}", String::from_utf8_lossy(&gen_rv64_output.stderr));
     }
+
+    println!(">>> {} <<<", "Done!".green());
 }
 
 
@@ -87,12 +93,12 @@ fn main() {
 
         if split.len() == 0 || split[split.len() - 1] != "c" {
             let err = GNCErr::InvalidSuffix;
-            panic!("{}", err);
+            println!("{} {}", "[ERROR]".red().bold(), err);
+            process::exit(1);
         }
 
         parse_file(file_path);
 
-        println!(">>> {} <<<", "Done!".green());
     } else {
         app.print_help().unwrap();
     }
@@ -120,8 +126,6 @@ mod tests {
             if !source_path.ends_with(".c") { continue; }
 
             parse_file(source_path);
-
-            println!(">>> {} <<<", "Done!".green());
         }
     }
 
