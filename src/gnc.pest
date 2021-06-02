@@ -83,14 +83,14 @@ unary_expression = {
     float_literal |
     bool_literal |
     int_literal |
-    bracket_expression |
     function_call |
     identifier |
-    op_arithmetic_not ~ unary_expression |
-    op_logical_not ~ unary_expression |
-    op_bitwise_not ~ unary_expression
+    op_arithmetic_not ~ cast_expression |
+    op_logical_not ~ cast_expression |
+    op_bitwise_not ~ cast_expression
 }
-multiplicative_expression = { unary_expression ~ ((op_mul | op_div | op_add) ~ unary_expression)* }
+cast_expression = { "(" ~ data_type ~ ")" ~ unary_expression | unary_expression }
+multiplicative_expression = { cast_expression ~ ((op_mul | op_div | op_mod ) ~ cast_expression)* }
 additive_expression = { multiplicative_expression ~ ((op_add | op_sub) ~ multiplicative_expression)* }
 shift_expression = { additive_expression ~ ((op_shift_right | op_shift_left) ~ additive_expression)* }
 comparison_expression = { shift_expression ~ ((op_ge | op_le | op_gt | op_lt)  ~ shift_expression)* }

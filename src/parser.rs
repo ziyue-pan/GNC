@@ -107,6 +107,7 @@ pub enum GNCAST {
     ContinueStatement,
     BreakStatement,
     ReturnStatement(Box<Option<GNCAST>>),
+    CastExpression(GNCType, Box<GNCAST>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
     BinaryExpression(BinaryOperator, Box<GNCAST>, Box<GNCAST>),
 
@@ -459,9 +460,25 @@ fn visit_expression(pair: Pair<'_, Rule>) -> GNCAST {
         visit_assignment(pair)
     } else if pair.as_rule() == Rule::unary_expression {
         visit_unary(pair)
+    } else if pair.as_rule() == Rule::cast_expression {
+        visit_cast(pair)
     } else {
         visit_binary(pair)
     };
+}
+
+
+fn visit_cast(pair: Pair<'_, Rule>) -> GNCAST {
+    let mut pairs = pair.into_inner();
+    let pair = pairs.next();
+    let token = pair.unwrap();
+
+    if token.as_rule() == Rule::unary_expression {
+        return visit_unary(token);
+    } else {
+        return GNCAST::CastExpression(visit_data_type(token),
+                                      Box::new(visit_unary(pairs.next().unwrap())));
+    }
 }
 
 fn visit_assignment(pair: Pair<'_, Rule>) -> GNCAST {
