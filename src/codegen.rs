@@ -1,13 +1,13 @@
 use inkwell::context::Context;
 use inkwell::module::Module;
 use std::path::{Path, PathBuf};
-use std::collections::{HashMap, VecDeque, HashSet};
+use std::collections::{HashMap, VecDeque};
 use parser::{GNCAST, UnaryOperator, BinaryOperator, AssignOperation, GNCParameter};
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
 use inkwell::{IntPredicate, FloatPredicate};
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
-use inkwell::values::{PointerValue, FunctionValue, BasicValue, BasicValueEnum};
+use inkwell::values::{PointerValue, FunctionValue, BasicValue, BasicValueEnum, InstructionOpcode};
 use inkwell::basic_block::BasicBlock;
 use inkwell::types::{BasicTypeEnum, BasicType, FunctionType};
 use checker::{GNCErr};
@@ -32,13 +32,13 @@ pub struct CodeGen<'ctx> {
     //<<<<<<<<<<<<<<<<<<<<<<<<
 
     // current function block
-    current_function: Option<FunctionValue<'ctx>>,
+    current_function: Option<(FunctionValue<'ctx>, Option<Type<'ctx>>)>,
     // break labels (in loop statements)
     break_labels: VecDeque<BasicBlock<'ctx>>,
     // continue labels (in loop statements)
     continue_labels: VecDeque<BasicBlock<'ctx>>,
     // hashset for functions
-    function_map: HashMap<String, Option<Type<'ctx>>>,
+    function_map: HashMap<String, (Option<Type<'ctx>>, Vec<Type<'ctx>>)>,
     // hashset for global variable
     global_variable_map: HashMap<String, (Type<'ctx>, PointerValue<'ctx>)>,
 }
@@ -171,7 +171,7 @@ impl<'ctx> CodeGen<'ctx> {
                           ret_type: &GNCType,
                           func_name: &String,
                           func_param: &Vec<GNCParameter>) -> Result<()> {
-        println!("[DEBUG] generate function protocol");
+//        println!("[DEBUG] generate function protocol");
 
         // cannot handle duplicate function
         if self.function_map.contains_key(func_name) {
@@ -181,24 +181,27 @@ impl<'ctx> CodeGen<'ctx> {
         }
 
         // function parameter should be added in this llvm_func_type
-        let mut param_types: Vec<BasicTypeEnum<'ctx>> = Vec::new();
+        let mut llvm_params: Vec<BasicTypeEnum<'ctx>> = Vec::new();
+        let mut params: Vec<Type<'ctx>> = Vec::new();
+
         for param in func_param {
             let ty = self.to_basic_type(&param.param_type)?;
-            param_types.push(ty.llvm_ty);
+            params.push(ty);
+            llvm_params.push(ty.llvm_ty);
         }
 
-        let llvm_func_ty = self.to_return_type(ret_type, &param_types)?;
+        let llvm_func_ty = self.to_return_type(ret_type, &llvm_params)?;
 
         // create function
         self.module.add_function(func_name.as_str(), llvm_func_ty, None);
 
-        let func_ty = if *ret_type != GNCType::Void {
+        let ret_ty = if *ret_type != GNCType::Void {
             Some(self.to_basic_type(ret_type)?)
         } else {
             None
         };
 
-        self.function_map.insert(func_name.to_owned(), func_ty);
+        self.function_map.insert(func_name.to_owned(), (ret_ty, params));
         Ok(())
     }
 
@@ -208,7 +211,7 @@ impl<'ctx> CodeGen<'ctx> {
                         func_name: &String,
                         func_param: &Vec<GNCParameter>,
                         func_body: &Vec<GNCAST>) -> Result<()> {
-        println!("[DEBUG] generate function definition");
+//        println!("[DEBUG] generate function definition");
         // push local map
         let local_map: HashMap<String, (Type<'ctx>, PointerValue<'ctx>)> = HashMap::new();
         self.addr_map_stack.push(local_map);
@@ -218,7 +221,8 @@ impl<'ctx> CodeGen<'ctx> {
             panic!();
         }
         let func = func_option.unwrap();
-        self.current_function = Some(func);
+        let func_ty = self.function_map.get(func_name).unwrap().0;
+        self.current_function = Some((func, func_ty));
 
         // create function block
         let func_block = self.context.append_basic_block(func, "entry");
@@ -299,12 +303,12 @@ impl<'ctx> CodeGen<'ctx> {
         // println!("in gen_statement {:?}", statement);
         match statement {
             GNCAST::ReturnStatement(ref ptr_to_expr) => {
-                println!("[DEBUG] generate return statement");
+//                println!("[DEBUG] generate return statement");
 
                 if ptr_to_expr.is_some() {
-                    let func = self.current_function.unwrap();
+                    let func_pair = self.current_function.unwrap();
 
-                    let ty_opt = func.get_type().get_return_type();
+                    let ty_opt = func_pair.1;
 
                     // return type mismatch
                     if ty_opt.is_none() {
@@ -312,19 +316,20 @@ impl<'ctx> CodeGen<'ctx> {
                     }
 
                     // TODO add type cast
-
                     let ty = ty_opt.unwrap();
 
                     let expr = ptr_to_expr.as_ref().as_ref().unwrap();
-                    let expr_val = self.gen_expression(&expr)?;
+                    let expr_pair = self.gen_expression(&expr)?;
 
-                    self.builder.build_return(Some(&expr_val.1));
+                    let ret_val = self.cast_value(&expr_pair.0, &expr_pair.1, &ty)?;
+
+                    self.builder.build_return(Some(&ret_val));
                 } else {
                     self.builder.build_return(None);
                 }
             }
             GNCAST::Declaration(ref data_type, ref identifier) => {
-                println!("[DEBUG] generate declaration");
+//                println!("[DEBUG] generate declaration");
                 let ty = self.to_basic_type(data_type)?;
 
                 let point_value = self.builder.build_alloca(ty.llvm_ty, identifier);
@@ -337,7 +342,7 @@ impl<'ctx> CodeGen<'ctx> {
             GNCAST::Assignment(ref op,
                                ref identifier,
                                ref expr) => {
-                println!("[DEBUG] generate assignment");
+//                println!("[DEBUG] generate assignment");
                 let ptr = self.get_variable(identifier)?;
 
                 let val = self.gen_binary_expression(
@@ -406,7 +411,7 @@ impl<'ctx> CodeGen<'ctx> {
                          cond: &Box<Option<GNCAST>>,
                          step: &Box<Option<GNCAST>>,
                          for_statements: &Box<GNCAST>) -> Result<()> {
-        let func = self.current_function.unwrap();
+        let func = self.current_function.unwrap().0;
 
         let before_block = self.context.append_basic_block(func,
                                                            "before_block");
@@ -472,7 +477,7 @@ impl<'ctx> CodeGen<'ctx> {
                         if_statements: &Box<GNCAST>,
                         else_statements: &Box<GNCAST>) -> Result<()> {
         // get current function
-        let func = self.current_function.unwrap();
+        let func = self.current_function.unwrap().0;
 
         // get condition
         let cond = self.gen_expression(cond)?;
@@ -517,9 +522,9 @@ impl<'ctx> CodeGen<'ctx> {
                             is_do_while: bool,
                             cond: &Box<GNCAST>,
                             while_statements: &Box<GNCAST>) -> Result<()> {
-        println!("[DEBUG] generate {} statement", if is_do_while { "do_while" } else { "while" });
+//        println!("[DEBUG] generate {} statement", if is_do_while { "do_while" } else { "while" });
 
-        let func = self.current_function.unwrap();
+        let func = self.current_function.unwrap().0;
 
         let before_block =
             self.context.append_basic_block(func, "before_while");
@@ -606,20 +611,24 @@ impl<'ctx> CodeGen<'ctx> {
                          function_name: &String,
                          parameters: &Vec<GNCAST>) -> Result<(Option<Type<'ctx>>,
                                                               Option<BasicValueEnum<'ctx>>)> {
-        println!("[DEBUG] generate function call");
+//        println!("[DEBUG] generate function call");
 
         // get function and return type
-        let ret_ty_opt = self.function_map.get(function_name);
-        let func_option = self.module.get_function(function_name);
+        let func_ty_opt = self.function_map.get(function_name);
+        let llvm_func_opt = self.module.get_function(function_name);
 
         // handle not found error
-        if ret_ty_opt.is_none() || func_option.is_none() {
+        if func_ty_opt.is_none() || llvm_func_opt.is_none() {
             let err = GNCErr::MissingFunction(function_name.to_string());
             return Err(err.into());
         }
 
-        let func = func_option.unwrap();
+        // get parameter count
+        let func = llvm_func_opt.unwrap();
         let func_param_count = func.get_type().count_param_types();
+
+        // func types
+        let func_ty_pair = func_ty_opt.unwrap();
 
         // handle calling parameter count mismatch
         if parameters.len() != func_param_count as usize {
@@ -633,25 +642,30 @@ impl<'ctx> CodeGen<'ctx> {
         // prepare function call arguments
         let mut compiled_args: Vec<BasicValueEnum> =
             Vec::with_capacity(parameters.len());
-
+        let param_types = func_ty_pair.1.to_owned();
 
         for (i, arg) in parameters.iter().enumerate() {
-            let func_param = func.get_nth_param(i as u32).unwrap().get_type();
+            // TODO generate type cast
+            let param_ty = *param_types.get(i).unwrap();
 
-            let arg_val = self.gen_expression(arg)?;
+            let arg_pair = self.gen_expression(arg)?;
 
+            let cast_ty = Type::cast(&arg_pair.0, &param_ty)?;
 
-            compiled_args.push(arg_val.1);
+            let cast_v = self.cast_value(&arg_pair.0,
+                                         &arg_pair.1, &param_ty)?;
+
+            compiled_args.push(cast_v);
         }
 
-        let value = self.builder.build_call(func_option.unwrap(),
+        let value = self.builder.build_call(llvm_func_opt.unwrap(),
                                             compiled_args.as_slice(),
                                             "").try_as_basic_value().left();
 
 
-        let ret_ty = *ret_ty_opt.unwrap();
+        // return type
+        let ret_ty = func_ty_pair.0;
 
-        // TODO fix function call
 
         if (ret_ty.is_some() && value.is_some()) || (ret_ty.is_none() && value.is_none()) {
             Ok((ret_ty, value))
@@ -787,7 +801,7 @@ impl<'ctx> CodeGen<'ctx> {
                             op: &UnaryOperator,
                             expr: &Box<GNCAST>)
                             -> Result<(Type<'ctx>, BasicValueEnum<'ctx>)> {
-        println!("[DEBUG] generate unary expression");
+//        println!("[DEBUG] generate unary expression");
 
         // generate result
         let pair = self.gen_expression(expr)?;
@@ -844,11 +858,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             UnaryOperator::BitwiseComplement => {
                 match ty.ty {
-                    GNCType::Bool |
-                    GNCType::Byte |
-                    GNCType::Short |
-                    GNCType::Int |
-                    GNCType::Long => {
+                    GNCType::Bool | GNCType::Byte | GNCType::Short | GNCType::Int | GNCType::Long => {
                         Ok((ty, self.builder.build_not(
                             v.into_int_value(),
                             "not").as_basic_value_enum()))
@@ -865,7 +875,7 @@ impl<'ctx> CodeGen<'ctx> {
                              lhs: &Box<GNCAST>,
                              rhs: &Box<GNCAST>)
                              -> Result<(Type<'ctx>, BasicValueEnum<'ctx>)> {
-        println!("[DEBUG] generate binary expression");
+//        println!("[DEBUG] generate binary expression");
 
         // generate (type, value) pair
         let lhs_pair = self.gen_expression(lhs)?;
@@ -873,16 +883,18 @@ impl<'ctx> CodeGen<'ctx> {
 
         // lhs (type, value)
         let lhs_ty = lhs_pair.0;
-        let lhs_v = lhs_pair.1;
-
         // rhs (type, value)
         let rhs_ty = rhs_pair.0;
-        let rhs_v = rhs_pair.1;
 
         // TODO default upcast
-        
-        match rhs_ty {
-            Type::IntType(_) => {
+        let cast_ty = Type::binary_cast(&lhs_ty, &rhs_ty)?;
+
+        let lhs_v = self.cast_value(&lhs_ty, &lhs_pair.1, &cast_ty)?;
+        let rhs_v = self.cast_value(&rhs_ty, &rhs_pair.1, &cast_ty)?;
+
+
+        match cast_ty.llvm_ty {
+            BasicTypeEnum::IntType(_) => {
                 let int_lhs_v = lhs_v.into_int_value();
                 let int_rhs_v = rhs_v.into_int_value();
 
@@ -915,9 +927,9 @@ impl<'ctx> CodeGen<'ctx> {
                     ),
                     BinaryOperator::FetchRHS => int_rhs_v
                 };
-                Ok((rhs_ty, int_val.as_basic_value_enum()))
+                Ok((cast_ty, int_val.as_basic_value_enum()))
             }
-            Type::FloatType(_) => {
+            BasicTypeEnum::FloatType(_) => {
                 let fp_lhs_v = lhs_v.into_float_value();
                 let fp_rhs_v = rhs_v.into_float_value();
 
@@ -965,7 +977,7 @@ impl<'ctx> CodeGen<'ctx> {
                     };
 
                     if fp_val.is_some() {
-                        Ok((rhs_ty, fp_val.unwrap().as_basic_value_enum()))
+                        Ok((cast_ty, fp_val.unwrap().as_basic_value_enum()))
                     } else {
                         let err = GNCErr::InvalidFloatingPointOperation();
                         return Err(err.into());
@@ -994,13 +1006,13 @@ impl<'ctx> CodeGen<'ctx> {
         let basic_ty = match in_type {
             GNCType::Bool => self.context.bool_type().as_basic_type_enum(),
             GNCType::Byte => self.context.i8_type().as_basic_type_enum(),
-            GNCType::UnsignedByte => self.context.i8_type().as_basic_type_enum(),
+            GNCType::UByte => self.context.i8_type().as_basic_type_enum(),
             GNCType::Short => self.context.i16_type().as_basic_type_enum(),
-            GNCType::UnsignedShort => self.context.i16_type().as_basic_type_enum(),
+            GNCType::UShort => self.context.i16_type().as_basic_type_enum(),
             GNCType::Int => self.context.i32_type().as_basic_type_enum(),
-            GNCType::UnsignedInt => self.context.i32_type().as_basic_type_enum(),
+            GNCType::UInt => self.context.i32_type().as_basic_type_enum(),
             GNCType::Long => self.context.i64_type().as_basic_type_enum(),
-            GNCType::UnsignedLong => self.context.i64_type().as_basic_type_enum(),
+            GNCType::ULong => self.context.i64_type().as_basic_type_enum(),
             GNCType::Float => self.context.f32_type().as_basic_type_enum(),
             GNCType::Double => self.context.f64_type().as_basic_type_enum(),
             _ => {
@@ -1023,9 +1035,241 @@ impl<'ctx> CodeGen<'ctx> {
         match in_type {
             GNCType::Void => Ok(self.context.void_type().fn_type(param_types, false)),
             _ => {
-                let basic_type = self.to_basic_type(in_type)?;
+                let basic_type = self.to_basic_type(in_type)?.llvm_ty;
                 Ok(basic_type.fn_type(param_types, false))
             }
         }
+    }
+
+
+    fn cast_value(&self,
+                  cur_ty: &Type<'ctx>,
+                  cur_val: &BasicValueEnum<'ctx>,
+                  cast_ty: &Type<'ctx>,
+    ) -> Result<BasicValueEnum<'ctx>> {
+        if cur_ty.ty == cast_ty.ty {
+            return Ok(*cur_val);
+        }
+
+        // TODO add bool type compare
+        let val = match cur_ty.ty {
+            GNCType::Float => {
+                match cast_ty.ty {
+                    GNCType::Byte | GNCType::Short | GNCType::Int | GNCType::Long => {
+                        self.builder.build_cast(InstructionOpcode::FPToSI, *cur_val,
+                                                cast_ty.llvm_ty, "float to signed")
+                    }
+                    GNCType::UByte | GNCType::UShort |
+                    GNCType::UInt | GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::FPToUI, *cur_val,
+                                                cast_ty.llvm_ty, "float to unsigned")
+                    }
+                    GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::FPExt, *cur_val,
+                                                cast_ty.llvm_ty, "float to double")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::Double => {
+                match cast_ty.ty {
+                    GNCType::Float => {
+                        self.builder.build_cast(InstructionOpcode::FPTrunc, *cur_val,
+                                                cast_ty.llvm_ty, "double to float")
+                    }
+                    GNCType::Byte | GNCType::Short | GNCType::Int | GNCType::Long => {
+                        self.builder.build_cast(InstructionOpcode::FPToSI, *cur_val,
+                                                cast_ty.llvm_ty, "double to signed")
+                    }
+
+                    GNCType::UByte | GNCType::UShort |
+                    GNCType::UInt | GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::FPToUI, *cur_val,
+                                                cast_ty.llvm_ty, "double to unsigned")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::Bool => {
+                match cast_ty.ty {
+                    GNCType::Byte | GNCType::UByte | GNCType::Short |
+                    GNCType::UShort | GNCType::Int | GNCType::UInt |
+                    GNCType::Long | GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
+                                                cast_ty.llvm_ty, "zero extending")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::UIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "unsigned to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::Byte => {
+                match cast_ty.ty {
+                    GNCType::Short | GNCType::Int | GNCType::Long => {
+                        self.builder.build_cast(InstructionOpcode::SExt, *cur_val,
+                                                cast_ty.llvm_ty, "signed extending")
+                    }
+                    GNCType::UByte | GNCType::UShort |
+                    GNCType::UInt | GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
+                                                cast_ty.llvm_ty, "zero extending")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::SIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "unsigned to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::UByte => {
+                match cast_ty.ty {
+                    GNCType::Byte => {
+                        self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
+                                                cast_ty.llvm_ty, "bit cast")
+                    }
+                    GNCType::Short | GNCType::Int | GNCType::Long | GNCType::UShort | GNCType::UInt | GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
+                                                cast_ty.llvm_ty, "zero extending")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::UIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "unsigned to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::Short => {
+                match cast_ty.ty {
+                    GNCType::Byte | GNCType::UByte => {
+                        self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
+                                                cast_ty.llvm_ty, "trunc")
+                    }
+                    GNCType::Int | GNCType::Long => {
+                        self.builder.build_cast(InstructionOpcode::SExt, *cur_val,
+                                                cast_ty.llvm_ty, "signed extending")
+                    }
+                    GNCType::UShort => {
+                        self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
+                                                cast_ty.llvm_ty, "bit cast")
+                    }
+                    GNCType::UInt | GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
+                                                cast_ty.llvm_ty, "zero extending")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::SIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "unsigned to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::UShort => {
+                match cast_ty.ty {
+                    GNCType::UShort => {
+                        self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
+                                                cast_ty.llvm_ty, "bit cast")
+                    }
+                    GNCType::Byte | GNCType::UByte => {
+                        self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
+                                                cast_ty.llvm_ty, "trunc")
+                    }
+                    GNCType::Int | GNCType::Long | GNCType::UInt | GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
+                                                cast_ty.llvm_ty, "zero extending")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::UIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "unsigned to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::Int => {
+                match cast_ty.ty {
+                    GNCType::Byte | GNCType::UByte | GNCType::Short | GNCType::UShort => {
+                        self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
+                                                cast_ty.llvm_ty, "trunc")
+                    }
+                    GNCType::UInt => {
+                        self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
+                                                cast_ty.llvm_ty, "bit cast")
+                    }
+                    GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
+                                                cast_ty.llvm_ty, "zero extending")
+                    }
+                    GNCType::Long => {
+                        self.builder.build_cast(InstructionOpcode::SExt, *cur_val,
+                                                cast_ty.llvm_ty, "signed extending")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::SIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "signed to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::UInt => {
+                match cast_ty.ty {
+                    GNCType::Int => {
+                        self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
+                                                cast_ty.llvm_ty, "bit cast")
+                    }
+                    GNCType::Byte | GNCType::UByte | GNCType::Short | GNCType::UShort => {
+                        self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
+                                                cast_ty.llvm_ty, "trunc")
+                    }
+                    GNCType::Long | GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
+                                                cast_ty.llvm_ty, "zero extending")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::UIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "unsigned to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::Long => {
+                match cast_ty.ty {
+                    GNCType::Byte | GNCType::UByte | GNCType::Short | GNCType::UShort | GNCType::UInt | GNCType::Int => {
+                        self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
+                                                cast_ty.llvm_ty, "trunc")
+                    }
+                    GNCType::ULong => {
+                        self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
+                                                cast_ty.llvm_ty, "bit cast")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::SIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "signed to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            GNCType::ULong => {
+                match cast_ty.ty {
+                    GNCType::Long => {
+                        self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
+                                                cast_ty.llvm_ty, "bit cast")
+                    }
+                    GNCType::Byte | GNCType::UByte | GNCType::Short | GNCType::UShort | GNCType::UInt | GNCType::Int => {
+                        self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
+                                                cast_ty.llvm_ty, "trunc")
+                    }
+                    GNCType::Float | GNCType::Double => {
+                        self.builder.build_cast(InstructionOpcode::UIToFP, *cur_val,
+                                                cast_ty.llvm_ty, "unsigned to float")
+                    }
+                    _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+                }
+            }
+            _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
+        };
+
+
+        return Ok(val);
     }
 }

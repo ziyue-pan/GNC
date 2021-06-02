@@ -1,5 +1,4 @@
 use pest::iterators::{Pair};
-use std::fmt;
 use serde::{Serialize};
 use types::GNCType;
 
@@ -13,13 +12,6 @@ pub struct GNCParser;
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 //      All the AST Enums
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-impl fmt::Display for GNCType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
 
 #[derive(Debug, Serialize)]
 pub struct GNCParameter {
@@ -603,13 +595,13 @@ fn visit_data_type(pair: Pair<'_, Rule>) -> GNCType {
     match token.as_rule() {
         Rule::bool => GNCType::Bool,
         Rule::byte => GNCType::Byte,
-        Rule::unsigned_byte => GNCType::UnsignedByte,
+        Rule::unsigned_byte => GNCType::UByte,
         Rule::short => GNCType::Short,
-        Rule::unsigned_short => GNCType::UnsignedShort,
+        Rule::unsigned_short => GNCType::UShort,
         Rule::int => GNCType::Int,
-        Rule::unsigned_int => GNCType::UnsignedInt,
+        Rule::unsigned_int => GNCType::UInt,
         Rule::long => GNCType::Long,
-        Rule::unsigned_long => GNCType::UnsignedLong,
+        Rule::unsigned_long => GNCType::ULong,
         Rule::float => GNCType::Float,
         Rule::double => GNCType::Double,
         Rule::void => GNCType::Void,

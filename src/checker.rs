@@ -21,13 +21,12 @@ pub enum GNCErr {
     #[error("cannot find function: {:?}", .0.as_str().yellow())]
     MissingFunction(String),
 
-    #[error("there are duplicate functions: {:?}", 0.as_str().yellow())]
+    #[error("there are duplicate functions: {:?}", .0.as_str().yellow())]
     DuplicateFunction(String),
 
     /* --- variables --- */
-    #[error("there are duplicate global variables: {:?}", 0.as_str().yellow())]
+    #[error("there are duplicate global variables: {:?}", .0.as_str().yellow())]
     DuplicateGlobalVar(String),
-
 
     #[error("")]
     MissingVariable(String),
@@ -36,8 +35,14 @@ pub enum GNCErr {
     #[error("")]
     InvalidType(GNCType),
 
-    #[error("")]
-    InvalidCast(),
+    #[error("cannot cast from {} to {}",
+    .0.to_string().as_str().yellow(),
+    .1.to_string().as_str().yellow())]
+    InvalidCast(GNCType, GNCType),
+
+    #[error("cannot cast automatically between {} and {}", .0.to_string().as_str().yellow(),
+    .1.to_string().as_str().yellow())]
+    InvalidDefaultCast(GNCType, GNCType),
 
     /* unary expression */
     #[error("")]
@@ -60,7 +65,6 @@ pub enum GNCErr {
 
     #[error("")]
     ReturnTypeMismatch(),
-
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),  // source and Display delegate to anyhow::Error
@@ -145,7 +149,6 @@ pub enum GNCErr {
 //            }
 //        }
 //
-//        process::exit(1);
 //    }
 //
 //}
