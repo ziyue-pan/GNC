@@ -666,7 +666,6 @@ impl<'ctx> CodeGen<'ctx> {
         // return type
         let ret_ty = func_ty_pair.0;
 
-
         if (ret_ty.is_some() && value.is_some()) || (ret_ty.is_none() && value.is_none()) {
             Ok((ret_ty, value))
         } else {
