@@ -30,10 +30,10 @@ jobs:
         directory: ${{ runner.temp }}/llvm
 
     - name: Build
-      run: cargo build --features web --package GNC --bin GNC
+      run: cargo build --package GNC --bin GNC
 
     - name: Test Compilation
-      run: cargo test --package GNC --bin GNC tests::test_compile --features web -- --exact --nocapture 
+      run: cargo test --package GNC --bin GNC tests::test_compile -- --exact --nocapture 
 
     # - name: Test Correctness
       
