@@ -79,7 +79,7 @@ impl<'ctx> Type<'ctx> {
     }
 
 
-    // cast
+    // default cast
     pub fn default_cast(
         cur_ty: &Type<'ctx>,
         cast_ty: &Type<'ctx>,

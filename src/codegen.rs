@@ -143,9 +143,12 @@ impl<'ctx> CodeGen<'ctx> {
                            var_type: &GNCType,
                            var_name: &String,
                            ptr_to_init: &Box<GNCAST>) -> Result<()> {
+        // handle duplicate global var or redefinition
         if self.global_variable_map.contains_key(var_name) {
-            let err = GNCErr::DuplicateGlobalVar(var_name.to_string());
-            return Err(err.into());
+            return Err(GNCErr::DuplicateGlobalVar(var_name.to_string()).into());
+        }
+        if self.function_map.contains_key(var_name) {
+            return Err(GNCErr::Redefinition(var_name.to_string()).into());
         }
 
         let ty = self.to_basic_type(var_type)?;
@@ -173,13 +176,14 @@ impl<'ctx> CodeGen<'ctx> {
                           ret_type: &GNCType,
                           func_name: &String,
                           func_param: &Vec<GNCParameter>) -> Result<()> {
-        println!("[DEBUG] generate function protocol");
+//        println!("[DEBUG] generate function protocol");
 
         // cannot handle duplicate function
         if self.function_map.contains_key(func_name) {
-            let err = GNCErr::DuplicateFunction(func_name.to_string());
-
-            return Err(err.into());
+            return Err(GNCErr::DuplicateFunction(func_name.to_string()).into());
+        }
+        if self.global_variable_map.contains_key(func_name) {
+            return Err(GNCErr::Redefinition(func_name.to_string()).into());
         }
 
         // function parameter should be added in this llvm_func_type
@@ -213,7 +217,7 @@ impl<'ctx> CodeGen<'ctx> {
                         func_name: &String,
                         func_param: &Vec<GNCParameter>,
                         func_body: &Vec<GNCAST>) -> Result<()> {
-        println!("[DEBUG] generate function definition");
+//        println!("[DEBUG] generate function definition");
         // push local map
         let local_map: HashMap<String, (Type<'ctx>, PointerValue<'ctx>)> = HashMap::new();
         self.addr_map_stack.push(local_map);
@@ -252,7 +256,7 @@ impl<'ctx> CodeGen<'ctx> {
                 ty.llvm_ty,
                 &arg_name,
             );
-            self.gen_variable(ty, &arg_name.to_string(), alloca);
+            self.gen_variable(ty, &arg_name.to_string(), alloca)?;
         }
 
         // generate IR for statements inside the function body
@@ -292,20 +296,22 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_variable(&mut self,
                     var_type: Type<'ctx>,
                     identifier: &String,
-                    ptr: PointerValue<'ctx>) {
-        match self.addr_map_stack.last_mut() {
-            Some(map) => {
-                map.insert(identifier.to_string(), (var_type, ptr));
-            }
-            _ => { panic!(identifier.to_string() + " not found. Addr HashMap Stack overflow"); }
+                    ptr: PointerValue<'ctx>) -> Result<()> {
+        let local_map = self.addr_map_stack.last_mut().unwrap();
+
+        if local_map.contains_key(identifier) {
+            return Err(GNCErr::DuplicateVar(identifier.to_string()).into());
         }
+
+        local_map.insert(identifier.to_string(), (var_type, ptr));
+        Ok(())
     }
 
     fn gen_statement(&mut self, statement: &GNCAST) -> Result<()> {
         // println!("in gen_statement {:?}", statement);
         match statement {
             GNCAST::ReturnStatement(ref ptr_to_expr) => {
-                println!("[DEBUG] generate return statement");
+//                println!("[DEBUG] generate return statement");
 
                 if ptr_to_expr.is_some() {
                     let func_pair = self.current_function.unwrap();
@@ -332,11 +338,11 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             GNCAST::Declaration(ref data_type, ref identifier) => {
-                println!("[DEBUG] generate declaration");
+//                println!("[DEBUG] generate declaration");
                 let ty = self.to_basic_type(data_type)?;
 
                 let point_value = self.builder.build_alloca(ty.llvm_ty, identifier);
-                self.gen_variable(ty, identifier, point_value);
+                self.gen_variable(ty, identifier, point_value)?;
             }
             GNCAST::FunctionCall(ref function_name,
                                  ref parameters) => {
@@ -345,7 +351,7 @@ impl<'ctx> CodeGen<'ctx> {
             GNCAST::Assignment(ref op,
                                ref identifier,
                                ref expr) => {
-                println!("[DEBUG] generate assignment");
+//                println!("[DEBUG] generate assignment");
                 let ptr_pair = self.get_variable(identifier)?;
 
                 let val_pair = self.gen_binary_expression(
@@ -526,7 +532,7 @@ impl<'ctx> CodeGen<'ctx> {
                             is_do_while: bool,
                             cond: &Box<GNCAST>,
                             while_statements: &Box<GNCAST>) -> Result<()> {
-        println!("[DEBUG] generate {} statement", if is_do_while { "do_while" } else { "while" });
+//        println!("[DEBUG] generate {} statement", if is_do_while { "do_while" } else { "while" });
 
         let func = self.current_function.unwrap().0;
 
@@ -615,7 +621,7 @@ impl<'ctx> CodeGen<'ctx> {
                          function_name: &String,
                          parameters: &Vec<GNCAST>) -> Result<(Option<Type<'ctx>>,
                                                               Option<BasicValueEnum<'ctx>>)> {
-        println!("[DEBUG] generate function call");
+//        println!("[DEBUG] generate function call");
 
         // get function and return type
         let func_ty_opt = self.function_map.get(function_name);
@@ -758,7 +764,7 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             GNCAST::CastExpression(ref to_type, ref expr) => {
-                println!("[DEBUG] generate cast");
+//                println!("[DEBUG] generate cast");
                 let cast_expr_pair = self.gen_expression(expr)?;
                 let cast_ty = self.to_basic_type(to_type)?;
                 let cast_v = self.cast_value(&cast_expr_pair.0,
@@ -811,7 +817,7 @@ impl<'ctx> CodeGen<'ctx> {
                             op: &UnaryOperator,
                             expr: &Box<GNCAST>)
                             -> Result<(Type<'ctx>, BasicValueEnum<'ctx>)> {
-        println!("[DEBUG] generate unary expression");
+//        println!("[DEBUG] generate unary expression");
 
         // generate result
         let pair = self.gen_expression(expr)?;
@@ -885,7 +891,7 @@ impl<'ctx> CodeGen<'ctx> {
                              lhs: &Box<GNCAST>,
                              rhs: &Box<GNCAST>)
                              -> Result<(Type<'ctx>, BasicValueEnum<'ctx>)> {
-        println!("[DEBUG] generate binary expression");
+//        println!("[DEBUG] generate binary expression");
 
         // generate (type, value) pair
         let lhs_pair = self.gen_expression(lhs)?;

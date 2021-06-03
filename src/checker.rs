@@ -22,6 +22,9 @@ pub enum GNCErr {
     #[error("unknown expression: {}", .0.as_str().yellow())]
     UnknownExpression(String),
 
+    #[error("redefinition of symbol: {}", .0.as_str().yellow())]
+    Redefinition(String),
+
     /* --- functions --- */
     #[error("cannot find function: {}", .0.as_str().yellow())]
     MissingFunction(String),
@@ -32,6 +35,9 @@ pub enum GNCErr {
     /* --- variables --- */
     #[error("there are duplicate global variables: {}", .0.as_str().yellow())]
     DuplicateGlobalVar(String),
+
+    #[error("there are duplicate local variables: {}", .0.as_str().yellow())]
+    DuplicateVar(String),
 
     #[error("")]
     MissingVariable(String),
