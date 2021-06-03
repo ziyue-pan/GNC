@@ -170,40 +170,38 @@ identifier = @{ !keyword ~ possible_identifier }
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 data_type = {
-    bool |
-    byte |
-    unsigned_byte |
-    short |
-    unsigned_short |
-    int |
-    unsigned_int |
-    long |
-    unsigned_long |
-    float |
-    double |
-    char |
-    void
+    bool ~ star* |
+    char ~ star* |
+    unsigned_char ~ star* |
+    short ~ star* |
+    unsigned_short ~ star* |
+    int ~ star* |
+    unsigned_int ~ star* |
+    long ~ star* |
+    unsigned_long ~ star* |
+    float ~ star* |
+    double ~ star* |
+    char ~ star* |
+    void ~ star*
 }
-
 
 // basic types
 bool = { "bool" }
 char = { "char" }
-byte = { "byte" }
-unsigned_byte = { "unsigned" ~ "byte" }
+unsigned_char = { "unsigned" ~ "char" }
 short = { "short" }
 unsigned_short = { "unsigned" ~ "short" }
 int = { "int" }
 unsigned_int = { "unsigned" ~ "int" }
 long = { "long" }
 unsigned_long = { "unsigned_long" }
-
-// float
 float = { "float" }
 double = { "double" }
 
 // void
 void = { "void" }
+
+star = { "*" }
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -234,7 +232,7 @@ keyword = {
     "bool" |
     "true" |
     "false" |
-    "byte" |
+    "char" |
     "short" |
     "double" |
     "float" |

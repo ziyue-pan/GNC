@@ -210,7 +210,7 @@ fn visit_global_variable(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
             }
             Rule::identifier => {
                 if uncommitted {
-                    ast.push(GNCAST::GlobalDeclaration(data_type,
+                    ast.push(GNCAST::GlobalDeclaration(data_type.to_owned(),
                                                        variable_name.clone(),
                                                        Box::new(GNCAST::IntLiteral(0))));
                 }
@@ -219,7 +219,7 @@ fn visit_global_variable(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
             }
             Rule::expression => {
                 if uncommitted {
-                    ast.push(GNCAST::GlobalDeclaration(data_type,
+                    ast.push(GNCAST::GlobalDeclaration(data_type.to_owned(),
                                                        variable_name.clone(),
                                                        Box::new(visit_expression(token))));
                     uncommitted = false;
@@ -231,7 +231,7 @@ fn visit_global_variable(pair: Pair<'_, Rule>, ast: &mut Vec<GNCAST>) {
     }
 
     if uncommitted {
-        ast.push(GNCAST::GlobalDeclaration(data_type,
+        ast.push(GNCAST::GlobalDeclaration(data_type.to_owned(),
                                            variable_name.clone(),
                                            Box::new(GNCAST::IntLiteral(0))));
     }
@@ -347,7 +347,7 @@ fn visit_declaration_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<G
             }
             Rule::identifier => {
                 variable_name = token.as_str().to_string();
-                func_statements.push(GNCAST::Declaration(data_type, variable_name.clone()))
+                func_statements.push(GNCAST::Declaration(data_type.to_owned(), variable_name.clone()))
             }
             Rule::expression => {
                 func_statements.push(GNCAST::Assignment(AssignOperation::Simple,
@@ -609,8 +609,8 @@ fn visit_data_type(pair: Pair<'_, Rule>) -> GNCType {
 
     match token.as_rule() {
         Rule::bool => GNCType::Bool,
-        Rule::byte => GNCType::Byte,
-        Rule::unsigned_byte => GNCType::UByte,
+        Rule::char => GNCType::Char,
+        Rule::unsigned_char => GNCType::UChar,
         Rule::short => GNCType::Short,
         Rule::unsigned_short => GNCType::UShort,
         Rule::int => GNCType::Int,

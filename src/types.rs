@@ -12,8 +12,8 @@ use std::fmt;
 pub enum GNCType {
     Void,
     Bool,
-    Byte,
-    UByte,
+    Char,
+    UChar,
     Short,
     UShort,
     Int,
@@ -22,6 +22,7 @@ pub enum GNCType {
     ULong,
     Float,
     Double,
+//    Pointer(Box<GNCType>),
 }
 
 impl fmt::Display for GNCType {
@@ -42,10 +43,11 @@ impl<'ctx> Type<'ctx> {
     // get upcast priority
     fn priority(&self) -> i32 {
         match self.ty {
-            GNCType::Void => 0,
+            GNCType::Void => -1,
+//            GNCType::Pointer(_) => -1,
             GNCType::Bool => 1,
-            GNCType::Byte => 2,
-            GNCType::UByte => 2,
+            GNCType::Char => 2,
+            GNCType::UChar => 2,
             GNCType::Short => 3,
             GNCType::UShort => 3,
             GNCType::Int => 4,
@@ -67,10 +69,19 @@ impl<'ctx> Type<'ctx> {
             return Ok(*lhs_ty);
         }
 
+        // get priority
+        let lhs_priority = lhs_ty.priority();
+        let rhs_priority = rhs_ty.priority();
+
+        // cannot do default cast between these types
+        if lhs_priority < 0 || rhs_priority < 0 {
+            return Err(GNCErr::InvalidDefaultCast(rhs_ty.ty, rhs_ty.ty).into());
+        }
+
         // default upcast
-        if lhs_ty.priority() < rhs_ty.priority() {
+        if lhs_priority < rhs_priority {
             return Ok(*rhs_ty);
-        } else if lhs_ty.priority() > rhs_ty.priority() {
+        } else if lhs_priority > rhs_priority {
             return Ok(*lhs_ty);
         }
 

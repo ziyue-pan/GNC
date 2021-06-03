@@ -705,7 +705,7 @@ impl<'ctx> CodeGen<'ctx> {
                     }
                 } else if v >= i8::MIN as i64 && v <= i8::MAX as i64 {
                     Type {
-                        ty: GNCType::Byte,
+                        ty: GNCType::Char,
                         llvm_ty: self.context.i8_type().as_basic_type_enum(),
                     }
                 } else if v >= i16::MIN as i64 && v <= i16::MAX as i64 {
@@ -829,7 +829,7 @@ impl<'ctx> CodeGen<'ctx> {
             UnaryOperator::UnaryMinus => {
                 match ty.ty {
                     GNCType::Bool |
-                    GNCType::Byte |
+                    GNCType::Char |
                     GNCType::Short |
                     GNCType::Int |
                     GNCType::Long => {
@@ -850,7 +850,7 @@ impl<'ctx> CodeGen<'ctx> {
             UnaryOperator::LogicalNot => {
                 match ty.ty {
                     GNCType::Bool |
-                    GNCType::Byte |
+                    GNCType::Char |
                     GNCType::Short |
                     GNCType::Int |
                     GNCType::Long => {
@@ -874,7 +874,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             UnaryOperator::BitwiseComplement => {
                 match ty.ty {
-                    GNCType::Bool | GNCType::Byte | GNCType::Short | GNCType::Int | GNCType::Long => {
+                    GNCType::Bool | GNCType::Char | GNCType::Short | GNCType::Int | GNCType::Long => {
                         Ok((ty, self.builder.build_not(
                             v.into_int_value(),
                             "not").as_basic_value_enum()))
@@ -1021,8 +1021,8 @@ impl<'ctx> CodeGen<'ctx> {
                      -> Result<Type<'ctx>> {
         let basic_ty = match in_type {
             GNCType::Bool => self.context.bool_type().as_basic_type_enum(),
-            GNCType::Byte => self.context.i8_type().as_basic_type_enum(),
-            GNCType::UByte => self.context.i8_type().as_basic_type_enum(),
+            GNCType::Char => self.context.i8_type().as_basic_type_enum(),
+            GNCType::UChar => self.context.i8_type().as_basic_type_enum(),
             GNCType::Short => self.context.i16_type().as_basic_type_enum(),
             GNCType::UShort => self.context.i16_type().as_basic_type_enum(),
             GNCType::Int => self.context.i32_type().as_basic_type_enum(),
@@ -1071,11 +1071,11 @@ impl<'ctx> CodeGen<'ctx> {
         let val = match cur_ty.ty {
             GNCType::Float => {
                 match cast_ty.ty {
-                    GNCType::Byte | GNCType::Short | GNCType::Int | GNCType::Long => {
+                    GNCType::Char | GNCType::Short | GNCType::Int | GNCType::Long => {
                         self.builder.build_cast(InstructionOpcode::FPToSI, *cur_val,
                                                 cast_ty.llvm_ty, "float to signed")
                     }
-                    GNCType::UByte | GNCType::UShort |
+                    GNCType::UChar | GNCType::UShort |
                     GNCType::UInt | GNCType::ULong => {
                         self.builder.build_cast(InstructionOpcode::FPToUI, *cur_val,
                                                 cast_ty.llvm_ty, "float to unsigned")
@@ -1093,12 +1093,12 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_cast(InstructionOpcode::FPTrunc, *cur_val,
                                                 cast_ty.llvm_ty, "double to float")
                     }
-                    GNCType::Byte | GNCType::Short | GNCType::Int | GNCType::Long => {
+                    GNCType::Char | GNCType::Short | GNCType::Int | GNCType::Long => {
                         self.builder.build_cast(InstructionOpcode::FPToSI, *cur_val,
                                                 cast_ty.llvm_ty, "double to signed")
                     }
 
-                    GNCType::UByte | GNCType::UShort |
+                    GNCType::UChar | GNCType::UShort |
                     GNCType::UInt | GNCType::ULong => {
                         self.builder.build_cast(InstructionOpcode::FPToUI, *cur_val,
                                                 cast_ty.llvm_ty, "double to unsigned")
@@ -1108,7 +1108,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             GNCType::Bool => {
                 match cast_ty.ty {
-                    GNCType::Byte | GNCType::UByte | GNCType::Short |
+                    GNCType::Char | GNCType::UChar | GNCType::Short |
                     GNCType::UShort | GNCType::Int | GNCType::UInt |
                     GNCType::Long | GNCType::ULong => {
                         self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
@@ -1121,13 +1121,13 @@ impl<'ctx> CodeGen<'ctx> {
                     _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
                 }
             }
-            GNCType::Byte => {
+            GNCType::Char => {
                 match cast_ty.ty {
                     GNCType::Short | GNCType::Int | GNCType::Long => {
                         self.builder.build_cast(InstructionOpcode::SExt, *cur_val,
                                                 cast_ty.llvm_ty, "signed extending")
                     }
-                    GNCType::UByte | GNCType::UShort |
+                    GNCType::UChar | GNCType::UShort |
                     GNCType::UInt | GNCType::ULong => {
                         self.builder.build_cast(InstructionOpcode::ZExt, *cur_val,
                                                 cast_ty.llvm_ty, "zero extending")
@@ -1139,9 +1139,9 @@ impl<'ctx> CodeGen<'ctx> {
                     _ => { return Err(GNCErr::InvalidCast(cur_ty.ty, cast_ty.ty).into()); }
                 }
             }
-            GNCType::UByte => {
+            GNCType::UChar => {
                 match cast_ty.ty {
-                    GNCType::Byte => {
+                    GNCType::Char => {
                         self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
                                                 cast_ty.llvm_ty, "bit cast")
                     }
@@ -1158,7 +1158,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             GNCType::Short => {
                 match cast_ty.ty {
-                    GNCType::Byte | GNCType::UByte => {
+                    GNCType::Char | GNCType::UChar => {
                         self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
                                                 cast_ty.llvm_ty, "trunc")
                     }
@@ -1187,7 +1187,7 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
                                                 cast_ty.llvm_ty, "bit cast")
                     }
-                    GNCType::Byte | GNCType::UByte => {
+                    GNCType::Char | GNCType::UChar => {
                         self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
                                                 cast_ty.llvm_ty, "trunc")
                     }
@@ -1204,7 +1204,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             GNCType::Int => {
                 match cast_ty.ty {
-                    GNCType::Byte | GNCType::UByte | GNCType::Short | GNCType::UShort => {
+                    GNCType::Char | GNCType::UChar | GNCType::Short | GNCType::UShort => {
                         self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
                                                 cast_ty.llvm_ty, "trunc")
                     }
@@ -1233,7 +1233,7 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
                                                 cast_ty.llvm_ty, "bit cast")
                     }
-                    GNCType::Byte | GNCType::UByte | GNCType::Short | GNCType::UShort => {
+                    GNCType::Char | GNCType::UChar | GNCType::Short | GNCType::UShort => {
                         self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
                                                 cast_ty.llvm_ty, "trunc")
                     }
@@ -1250,7 +1250,7 @@ impl<'ctx> CodeGen<'ctx> {
             }
             GNCType::Long => {
                 match cast_ty.ty {
-                    GNCType::Byte | GNCType::UByte | GNCType::Short | GNCType::UShort | GNCType::UInt | GNCType::Int => {
+                    GNCType::Char | GNCType::UChar | GNCType::Short | GNCType::UShort | GNCType::UInt | GNCType::Int => {
                         self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
                                                 cast_ty.llvm_ty, "trunc")
                     }
@@ -1271,7 +1271,7 @@ impl<'ctx> CodeGen<'ctx> {
                         self.builder.build_cast(InstructionOpcode::BitCast, *cur_val,
                                                 cast_ty.llvm_ty, "bit cast")
                     }
-                    GNCType::Byte | GNCType::UByte | GNCType::Short | GNCType::UShort | GNCType::UInt | GNCType::Int => {
+                    GNCType::Char | GNCType::UChar | GNCType::Short | GNCType::UShort | GNCType::UInt | GNCType::Int => {
                         self.builder.build_cast(InstructionOpcode::Trunc, *cur_val,
                                                 cast_ty.llvm_ty, "trunc")
                     }
