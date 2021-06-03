@@ -22,9 +22,9 @@ use inkwell::context::Context;
 use colored::Colorize;
 use std::process;
 
-mod types;
 mod parser;
 mod codegen;
+mod types;
 mod checker;
 
 fn parse_file(file_path: &str) {

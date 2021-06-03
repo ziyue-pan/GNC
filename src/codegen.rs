@@ -143,9 +143,12 @@ impl<'ctx> CodeGen<'ctx> {
                            var_type: &GNCType,
                            var_name: &String,
                            ptr_to_init: &Box<GNCAST>) -> Result<()> {
+        // handle duplicate global var or redefinition
         if self.global_variable_map.contains_key(var_name) {
-            let err = GNCErr::DuplicateGlobalVar(var_name.to_string());
-            return Err(err.into());
+            return Err(GNCErr::DuplicateGlobalVar(var_name.to_string()).into());
+        }
+        if self.function_map.contains_key(var_name) {
+            return Err(GNCErr::Redefinition(var_name.to_string()).into());
         }
 
         let ty = self.to_basic_type(var_type)?;
@@ -157,7 +160,7 @@ impl<'ctx> CodeGen<'ctx> {
         // TODO add const_val check
 
         let init_val_pair = self.gen_expression(&**ptr_to_init)?;
-        let cast_ty = Type::cast(&init_val_pair.0, &ty)?;
+        let cast_ty = Type::default_cast(&init_val_pair.0, &ty)?;
         let cast_v = self.cast_value(&init_val_pair.0, &init_val_pair.1, &cast_ty)?;
 
         global_value.set_initializer(&cast_v);
@@ -177,9 +180,10 @@ impl<'ctx> CodeGen<'ctx> {
 
         // cannot handle duplicate function
         if self.function_map.contains_key(func_name) {
-            let err = GNCErr::DuplicateFunction(func_name.to_string());
-
-            return Err(err.into());
+            return Err(GNCErr::DuplicateFunction(func_name.to_string()).into());
+        }
+        if self.global_variable_map.contains_key(func_name) {
+            return Err(GNCErr::Redefinition(func_name.to_string()).into());
         }
 
         // function parameter should be added in this llvm_func_type
@@ -252,7 +256,7 @@ impl<'ctx> CodeGen<'ctx> {
                 ty.llvm_ty,
                 &arg_name,
             );
-            self.gen_variable(ty, &arg_name.to_string(), alloca);
+            self.gen_variable(ty, &arg_name.to_string(), alloca)?;
         }
 
         // generate IR for statements inside the function body
@@ -292,13 +296,15 @@ impl<'ctx> CodeGen<'ctx> {
     fn gen_variable(&mut self,
                     var_type: Type<'ctx>,
                     identifier: &String,
-                    ptr: PointerValue<'ctx>) {
-        match self.addr_map_stack.last_mut() {
-            Some(map) => {
-                map.insert(identifier.to_string(), (var_type, ptr));
-            }
-            _ => { panic!(identifier.to_string() + " not found. Addr HashMap Stack overflow"); }
+                    ptr: PointerValue<'ctx>) -> Result<()> {
+        let local_map = self.addr_map_stack.last_mut().unwrap();
+
+        if local_map.contains_key(identifier) {
+            return Err(GNCErr::DuplicateVar(identifier.to_string()).into());
         }
+
+        local_map.insert(identifier.to_string(), (var_type, ptr));
+        Ok(())
     }
 
     fn gen_statement(&mut self, statement: &GNCAST) -> Result<()> {
@@ -323,7 +329,7 @@ impl<'ctx> CodeGen<'ctx> {
                     let expr_pair = self.gen_expression(&expr)?;
 
                     // cast metadata
-                    let cast_ty = Type::cast(&expr_pair.0, &ret_ty)?;
+                    let cast_ty = Type::default_cast(&expr_pair.0, &ret_ty)?;
                     let ret_val = self.cast_value(&expr_pair.0, &expr_pair.1, &cast_ty)?;
 
                     self.builder.build_return(Some(&ret_val));
@@ -336,7 +342,7 @@ impl<'ctx> CodeGen<'ctx> {
                 let ty = self.to_basic_type(data_type)?;
 
                 let point_value = self.builder.build_alloca(ty.llvm_ty, identifier);
-                self.gen_variable(ty, identifier, point_value);
+                self.gen_variable(ty, identifier, point_value)?;
             }
             GNCAST::FunctionCall(ref function_name,
                                  ref parameters) => {
@@ -367,7 +373,7 @@ impl<'ctx> CodeGen<'ctx> {
                 )?;
 
                 // cast
-                let cast_ty = Type::cast(&val_pair.0, &ptr_pair.0)?;
+                let cast_ty = Type::default_cast(&val_pair.0, &ptr_pair.0)?;
                 let cast_v = self.cast_value(&val_pair.0, &val_pair.1, &cast_ty)?;
 
                 self.builder.build_store(ptr_pair.1, cast_v);
@@ -653,7 +659,7 @@ impl<'ctx> CodeGen<'ctx> {
             let arg_pair = self.gen_expression(arg)?;
 
             //  type cast
-            let cast_ty = Type::cast(&arg_pair.0, &param_ty)?;
+            let cast_ty = Type::default_cast(&arg_pair.0, &param_ty)?;
             let cast_v = self.cast_value(&arg_pair.0, &arg_pair.1, &cast_ty)?;
 
             compiled_args.push(cast_v);
@@ -748,16 +754,26 @@ impl<'ctx> CodeGen<'ctx> {
             }
             GNCAST::FunctionCall(ref function_name,
                                  ref parameters) => {
-                let call_opt = self.gen_function_call(function_name, parameters)?;
+                let call_pair = self.gen_function_call(function_name, parameters)?;
 
-                if call_opt.0.is_some() && call_opt.1.is_some() {
-                    Ok((call_opt.0.unwrap(), call_opt.1.unwrap()))
+                if call_pair.0.is_some() && call_pair.1.is_some() {
+                    Ok((call_pair.0.unwrap(), call_pair.1.unwrap()))
                 } else {
                     let err = GNCErr::ReturnTypeMismatch();
                     return Err(err.into());
                 }
             }
-            _ => { panic!("Invalid Expression Type") }
+            GNCAST::CastExpression(ref to_type, ref expr) => {
+//                println!("[DEBUG] generate cast");
+                let cast_expr_pair = self.gen_expression(expr)?;
+                let cast_ty = self.to_basic_type(to_type)?;
+                let cast_v = self.cast_value(&cast_expr_pair.0,
+                                             &cast_expr_pair.1,
+                                             &cast_ty)?;
+
+                return Ok((cast_ty, cast_v));
+            }
+            _ => { return Err(GNCErr::UnknownExpression(expression.to_string()).into()); }
         }
     }
 
