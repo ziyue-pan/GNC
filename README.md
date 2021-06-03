@@ -17,7 +17,7 @@
 - [x] function
 - [x] global variable
 - [x] more types
-- [ ] cast expression
+- [x] cast expression
 - [ ] pointer
 - [ ] array
 - [ ] string

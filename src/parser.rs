@@ -1,7 +1,6 @@
 use pest::iterators::{Pair};
-use types::GNCType;
 use serde::{Serialize};
-
+use types::GNCType;
 
 #[derive(Parser, Serialize)]
 #[grammar = "./gnc.pest"]

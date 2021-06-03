@@ -2,6 +2,8 @@ use colored::{Colorize};
 //use pest::Span;
 use thiserror::Error;
 use types::GNCType;
+use parser::GNCAST;
+use std::fmt;
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -17,15 +19,18 @@ pub enum GNCErr {
     #[error("the source file extension must be `.c`!")]
     InvalidSuffix,
 
+    #[error("unknown expression: {}", .0.as_str().yellow())]
+    UnknownExpression(String),
+
     /* --- functions --- */
-    #[error("cannot find function: {:?}", .0.as_str().yellow())]
+    #[error("cannot find function: {}", .0.as_str().yellow())]
     MissingFunction(String),
 
-    #[error("there are duplicate functions: {:?}", .0.as_str().yellow())]
+    #[error("there are duplicate functions: {}", .0.as_str().yellow())]
     DuplicateFunction(String),
 
     /* --- variables --- */
-    #[error("there are duplicate global variables: {:?}", .0.as_str().yellow())]
+    #[error("there are duplicate global variables: {}", .0.as_str().yellow())]
     DuplicateGlobalVar(String),
 
     #[error("")]
@@ -68,6 +73,13 @@ pub enum GNCErr {
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),  // source and Display delegate to anyhow::Error
+}
+
+
+impl fmt::Display for GNCAST {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 
