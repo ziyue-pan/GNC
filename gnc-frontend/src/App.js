@@ -1,13 +1,14 @@
 import './App.css';
 import {useEffect, useState} from "react";
 import {Button, Card, CardLabelText, Footer, Header, Input, Title} from "./components/Basic"
-import Editor from "@monaco-editor/react";
+import MonacoEditor from "@monaco-editor/react";
 import AntVTree from "./components/AntVG6";
 import DropMenu from "./components/DropMenu";
 import Modal from "./components/Modal";
 import {compile_result} from "gnc";
 import AST2VisualizationData from "./utils/AST2VisData";
 import {ExampleOptions} from "./data/examples";
+import useWindowSize from "./hook/useWindowSize";
 
 const VisOptions = [
     {
@@ -31,9 +32,14 @@ function App() {
     const [code, editCode] = useState(exampleCode.code)
 
     // modal hooks
+    const [isWarning, setIsWarning] = useState(false)
     const [showError, setShowError] = useState(false)
     const [errorTitle, setErrorTitle] = useState('')
     const [errorContent, setErrorContent] = useState('')
+
+    // resize hooks
+    const windowSize = useWindowSize()
+    const [lastWindowSize, setLastWindowSize] = useState([0, 0])
 
     const compile = () => {
         let data = JSON.parse(compile_result(code))
@@ -41,6 +47,7 @@ function App() {
             setParseTree(data['parse_tree'])
             setAST(AST2VisualizationData(data['ast']))
         } else {
+            setIsWarning(false)
             setErrorTitle('Compilation Error')
             setErrorContent(data['error_message'])
             setShowError(true)
@@ -57,9 +64,25 @@ function App() {
         // eslint-disable-next-line
     }, [])
 
+    useEffect(() => {
+        const [lastWidth, lastHeight] = lastWindowSize
+        const [width, height] = windowSize
+        if (width < lastWidth || height < lastHeight) {
+            if (!showError) {
+                setIsWarning(true)
+                setErrorTitle('Detected Window Shrink!')
+                setErrorContent('We detected a window shrink on your browser, please refresh to get better experience.')
+                setShowError(true)
+            }
+        }
+        setLastWindowSize(windowSize)
+        // eslint-disable-next-line
+    }, [windowSize])
+
     return (
         <div className={'bg-green-100'}>
             <Modal
+                isWarning={isWarning}
                 visible={showError}
                 title={errorTitle}
                 content={errorContent}
@@ -91,12 +114,23 @@ function App() {
                         onChange={handleExampleCodeChange}
                     />}
                     content={
-                        <Editor
+                        <MonacoEditor
                             defaultLanguage="c"
                             theme="light"
+                            width={'100%'}
                             onChange={editCode}
                             value={code}
                         />
+                        // <Editor
+                        //     value={code}
+                        //     onValueChange={editCode}
+                        //     highlight={code => highlight(code, languages.c)}
+                        //     padding={10}
+                        //     style={{
+                        //         fontFamily: 'monospace',
+                        //         fontSize: 12,
+                        //     }}
+                        // />
                     }
                 />
                 <Card
