@@ -1,83 +1,7 @@
 /***
  * Mocked Data
  */
-const data = {
-    "error": false, "error_message": "", "parse_tree": {
-        "id": "gnc(0,28)", "label": "gnc", "children": [{
-            "id": "function(0,28)",
-            "label": "function",
-            "children": [{
-                "id": "data_type(0,3)",
-                "label": "data_type",
-                "children": [{"id": "int(0,3)", "label": "int", "children": []}]
-            }, {"id": "identifier(4,8)", "label": "identifier", "children": []}, {
-                "id": "function_parameter_list(8,10)",
-                "label": "function_parameter_list",
-                "children": []
-            }, {
-                "id": "statement(17,26)", "label": "statement", "children": [{
-                    "id": "return_statement(17,25)", "label": "return_statement", "children": [{
-                        "id": "expression(24,25)", "label": "expression", "children": [{
-                            "id": "logical_or_expression(24,25)", "label": "logical_or_expression", "children": [{
-                                "id": "logical_and_expression(24,25)",
-                                "label": "logical_and_expression",
-                                "children": [{
-                                    "id": "inclusive_or_expression(24,25)",
-                                    "label": "inclusive_or_expression",
-                                    "children": [{
-                                        "id": "exclusive_or_expression(24,25)",
-                                        "label": "exclusive_or_expression",
-                                        "children": [{
-                                            "id": "bitwise_and_expression(24,25)",
-                                            "label": "bitwise_and_expression",
-                                            "children": [{
-                                                "id": "equality_expression(24,25)",
-                                                "label": "equality_expression",
-                                                "children": [{
-                                                    "id": "comparison_expression(24,25)",
-                                                    "label": "comparison_expression",
-                                                    "children": [{
-                                                        "id": "shift_expression(24,25)",
-                                                        "label": "shift_expression",
-                                                        "children": [{
-                                                            "id": "additive_expression(24,25)",
-                                                            "label": "additive_expression",
-                                                            "children": [{
-                                                                "id": "multiplicative_expression(24,25)",
-                                                                "label": "multiplicative_expression",
-                                                                "children": [{
-                                                                    "id": "cast_expression(24,25)",
-                                                                    "label": "cast_expression",
-                                                                    "children": [{
-                                                                        "id": "unary_expression(24,25)",
-                                                                        "label": "unary_expression",
-                                                                        "children": [{
-                                                                            "id": "int_literal(24,25)",
-                                                                            "label": "int_literal",
-                                                                            "children": [{
-                                                                                "id": "dec_literal(24,25)",
-                                                                                "label": "dec_literal",
-                                                                                "children": []
-                                                                            }]
-                                                                        }]
-                                                                    }]
-                                                                }]
-                                                            }]
-                                                        }]
-                                                    }]
-                                                }]
-                                            }]
-                                        }]
-                                    }]
-                                }]
-                            }]
-                        }]
-                    }]
-                }]
-            }]
-        }, {"id": "EOI(28,28)", "label": "EOI", "children": []}]
-    }, "ast": [{"Function": ["Int", "main", [], [{"ReturnStatement": {"IntLiteral": 233}}]]}]
-}
+const data = {"error":false,"error_message":"","parse_tree":{"id":"gnc(0,33)","label":"gnc","children":[{"id":"function(0,33)","label":"function","children":[{"id":"data_type(0,3)","label":"data_type","children":[{"id":"int(0,3)","label":"int","children":[]}]},{"id":"identifier(4,8)","label":"identifier","children":[]},{"id":"function_parameter_list(8,15)","label":"function_parameter_list","children":[{"id":"function_parameter(9,14)","label":"function_parameter","children":[{"id":"data_type(9,12)","label":"data_type","children":[{"id":"int(9,12)","label":"int","children":[]}]},{"id":"identifier(13,14)","label":"identifier","children":[]}]}]},{"id":"statement(22,31)","label":"statement","children":[{"id":"return_statement(22,30)","label":"return_statement","children":[{"id":"expression(29,30)","label":"expression","children":[{"id":"logical_or_expression(29,30)","label":"logical_or_expression","children":[{"id":"logical_and_expression(29,30)","label":"logical_and_expression","children":[{"id":"inclusive_or_expression(29,30)","label":"inclusive_or_expression","children":[{"id":"exclusive_or_expression(29,30)","label":"exclusive_or_expression","children":[{"id":"bitwise_and_expression(29,30)","label":"bitwise_and_expression","children":[{"id":"equality_expression(29,30)","label":"equality_expression","children":[{"id":"comparison_expression(29,30)","label":"comparison_expression","children":[{"id":"shift_expression(29,30)","label":"shift_expression","children":[{"id":"additive_expression(29,30)","label":"additive_expression","children":[{"id":"multiplicative_expression(29,30)","label":"multiplicative_expression","children":[{"id":"cast_expression(29,30)","label":"cast_expression","children":[{"id":"unary_expression(29,30)","label":"unary_expression","children":[{"id":"identifier(29,30)","label":"identifier","children":[]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]}]},{"id":"EOI(33,33)","label":"EOI","children":[]}]},"ast":[{"Function":["Int","main",[{"param_type":"Int","param_name":"a"}],[{"ReturnStatement":{"Identifier":"a"}}]]}]}
 const astData = data.ast
 
 /***
@@ -116,7 +40,7 @@ function evalAST(ast, entryPoint, args) {
                         throw new Error(`${x} not implemented`)
                         break
                     case "Identifier":
-                        throw new Error(`${x} not implemented`)
+                        res = findSymbol(node[x])
                         break
 
                     // literals
@@ -168,7 +92,6 @@ function evalAST(ast, entryPoint, args) {
                         break
                     case "ReturnStatement":
                         res = visitNode([node[x]])
-                        // throw new Error(`${x} not implemented`)
                         break
                     case "FunctionCall":
                         const [funcCallName, funcArguments] = node[x]
@@ -177,10 +100,10 @@ function evalAST(ast, entryPoint, args) {
                         symbolTable.push({})
                         // eslint-disable-next-line array-callback-return
                         callee.parameters.map(function(parameter, i) {
-                            const [param_type, param_name] = parameter
+                            const {param_type, param_name} = parameter
                             symbolTable[0][param_name] = {
                                 type: param_type,
-                                value: visitNode(funcArguments[i]) // TODO cast arguments to parameter type
+                                value: visitNode([funcArguments[i]]).value // TODO cast arguments to parameter type
                             }
                         })
                         res = visitNode(callee.funcBlock)
@@ -233,5 +156,5 @@ function evalAST(ast, entryPoint, args) {
     return res
 }
 
-const res = evalAST(astData, 'main', []) // {"IntLiteral": 233}
+const res = evalAST(astData, 'main', [{"IntLiteral": 666}])
 console.log(JSON.stringify(res, null, 2))
