@@ -53,10 +53,40 @@ function evalAST(ast, entryPoint, args) {
                     case "Assignment":
                         const [assignOperation, leftValue, assignChildren] = node[x]
                         const variable = findSymbol(leftValue) // TODO implement real leftValue
+                        res = castValue(visitNode([assignChildren]), variable.type)
                         switch (assignOperation) {
                             case "Simple":
-                                res = castValue(visitNode([assignChildren]), variable.type)
                                 variable.value = res.value
+                                break
+                            case "Addition":
+                                variable.value += res.value
+                                break
+                            case "Subtraction":
+                                variable.value -= res.value
+                                break
+                            case "Multiplication":
+                                variable.value *= res.value
+                                break
+                            case "Division":
+                                variable.value /= res.value
+                                break
+                            case "Modulus":
+                                variable.value %= res.value
+                                break
+                            case "BitwiseAnd":
+                                variable.value &= res.value
+                                break
+                            case "InclusiveOr":
+                                variable.value |= res.value
+                                break
+                            case "ExclusiveOr":
+                                variable.value ^= res.value
+                                break
+                            case "ShiftLeft":
+                                variable.value <<= res.value
+                                break
+                            case "ShiftRight":
+                                variable.value >>= res.value
                                 break
                             default:
                                 throw new Error(`${assignOperation} not implemented`)
@@ -101,10 +131,16 @@ function evalAST(ast, entryPoint, args) {
                         break
                     case "UnaryExpression":
                         const [unaryOperator, unaryExpression] = node[x]
+                        res = visitNode([unaryExpression])
                         switch (unaryOperator) {
                             case "UnaryMinus":
-                                res = visitNode([unaryExpression])
                                 res.value *= -1
+                                break
+                            case "BitwiseComplement":
+                                res.value = ~res.value
+                                break
+                            case "LogicalNot":
+                                res.value = !res.value
                                 break
                             default:
                                 throw new Error(`${unaryOperator} not implemented`)
@@ -183,5 +219,5 @@ function evalAST(ast, entryPoint, args) {
     return visitNode(funcCall)
 }
 
-const res = evalAST(astData, 'neg_unary', [])
+const res = evalAST(astData, 'complement_unary', [])
 console.log(JSON.stringify(res, null, 2))
