@@ -26,6 +26,21 @@ function evalAST(ast, entryPoint, args) {
         throw Error(`Can not find symbol ${symbolName}`)
     }
 
+    const castValue = (origData, destType) => {
+        let res = {
+            type: destType,
+            value: origData.value
+        }
+        switch (destType) {
+            case "Int":
+                res.value = Math.floor(origData.value)
+                break
+            default:
+                throw new Error(`Cast to ${destType} not implemented`)
+        }
+        return res
+    }
+
     const visitNode = (astNode) => {
         let res = null
         for (const node of astNode) {
@@ -84,7 +99,7 @@ function evalAST(ast, entryPoint, args) {
                     // functions
                     case "Function":
                         const [retType, funcName, parameters, funcChildren] = node[x]
-                        symbolTable[0][funcName] = {
+                        symbolTable.slice(-1)[0][funcName] = {
                             retType,
                             parameters,
                             funcBlock: funcChildren
@@ -101,14 +116,9 @@ function evalAST(ast, entryPoint, args) {
                         // eslint-disable-next-line array-callback-return
                         callee.parameters.map(function(parameter, i) {
                             const {param_type, param_name} = parameter
-                            symbolTable[0][param_name] = {
-                                type: param_type,
-                                value: visitNode([funcArguments[i]]).value // TODO cast arguments to parameter type
-                            }
+                            symbolTable.slice(-1)[0][param_name] = castValue(visitNode([funcArguments[i]]), param_type)
                         })
-                        res = visitNode(callee.funcBlock)
-                        // TODO cast to retType
-                        res.type = callee.retType
+                        res = castValue(visitNode(callee.funcBlock), callee.retType)
                         symbolTable.pop()
                         break
 
@@ -156,5 +166,5 @@ function evalAST(ast, entryPoint, args) {
     return res
 }
 
-const res = evalAST(astData, 'main', [{"IntLiteral": 666}])
+const res = evalAST(astData, 'main', [{"IntLiteral": 666.233333}])
 console.log(JSON.stringify(res, null, 2))
