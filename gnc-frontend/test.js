@@ -161,9 +161,7 @@ function evalAST(ast, entryPoint, args) {
             args
         ]
     }]
-    const res = visitNode(funcCall)
-
-    return res
+    return visitNode(funcCall)
 }
 
 const res = evalAST(astData, 'main', [{"IntLiteral": 666.233333}])
