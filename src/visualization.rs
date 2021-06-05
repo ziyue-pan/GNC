@@ -5,7 +5,6 @@ extern crate pest_derive;
 extern crate serde;
 extern crate colored;
 extern crate walkdir;
-extern crate inkwell;
 
 use serde::{Serialize};
 use wasm_bindgen::prelude::*;

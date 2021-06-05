@@ -20,9 +20,8 @@ export default function AST2VisualizationData(ast) {
                         const [assignOperation, leftValue, assignChildren] = node[x]
                         treeNode.attrs = {
                             assignOperation,
-                            leftValue
                         }
-                        treeNode.children = node2tree([assignChildren])
+                        treeNode.children = node2tree([leftValue, assignChildren])
                         break
                     case "Identifier":
                         treeNode.attrs = {
