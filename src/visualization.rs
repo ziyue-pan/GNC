@@ -39,13 +39,11 @@ fn visualize_parse_tree(pair: Pair<'_, parser::Rule>) -> VisTreeNode {
         node_children.push(visualize_parse_tree(token));
     }
 
-    let mut parse_tree = VisTreeNode{
+    return VisTreeNode{
         id: node_id,
         label: node_label,
         children: node_children
     };
-
-    return parse_tree;
 }
 
 #[wasm_bindgen]

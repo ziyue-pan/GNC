@@ -71,6 +71,13 @@ export default function AST2VisualizationData(ast) {
                         }
                         treeNode.children = node2tree([unaryExpression])
                         break
+                    case "CastExpression":
+                        const [castType, castExpression] = node[x]
+                        treeNode.attrs = {
+                            castType
+                        }
+                        treeNode.children = node2tree([castExpression])
+                        break
 
                     // functions
                     case "Function":
