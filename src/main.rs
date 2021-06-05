@@ -41,8 +41,6 @@ fn parse_file(file_path: &str) {
     let gnc_pair = pairs.next().unwrap();
 
     let ast = parser::parse(gnc_pair);
-    let serialized_ast = serde_json::to_string(&ast).unwrap();
-    println!("serialized = {}", serialized_ast);
 
     let context = Context::create();
     let mut code_gen = CodeGen::new(&context, file_path);
