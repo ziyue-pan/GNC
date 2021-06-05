@@ -1,11 +1,7 @@
 //>>>>>>>>>>>>>>>>>>>>>>>>
 //      TOP RULES
 //<<<<<<<<<<<<<<<<<<<<<<<<
-gnc = {
-    SOI
-    ~ (function | global_variable)*
-    ~EOI
-}
+gnc = { SOI ~ (function | global_variable)* ~ EOI }
 
 
 //>>>>>>>>>>>>>>>>>>>>>>
@@ -48,8 +44,8 @@ statement = {
 
 // declaration statement
 declaration_statement = {
-    data_type ~ (identifier ~ ("=" ~ expression)?) ~
-    ("," ~ (identifier ~ ("=" ~ expression)?))*     // declaration
+    data_type ~ (identifier ~ ("[" ~ int_literal ~ "]")* ~ ("=" ~ expression)?) ~
+    ("," ~ (identifier ~ ("[" ~ int_literal ~ "]")* ~ ("=" ~ expression)?))*     // declaration
 }
 
 return_statement = { "return" ~ expression? }

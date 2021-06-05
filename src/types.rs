@@ -57,7 +57,7 @@ impl GNCType {
         return match self {
             GNCType::Pointer(ref ty) => Ok(*ty.clone()),
             _ => { Err(GNCErr::DereferenceNonPointer(self.clone()).into()) }
-        }
+        };
     }
 }
 

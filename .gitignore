@@ -25,6 +25,7 @@ doc/Report.pdf
 *.wasm
 *.s
 
+*.o
 *.out
 *.ll
 *.bc

@@ -1,14 +1,13 @@
 
-
 int _foo(int a, int b) {
     return a + b;
 }
 
 
 int main() {
-    return _foo(0, 1);
+    int a = _foo(0, 0);
+    return a;
 }
-
 
 
 int bar(int a, int b, int c) {

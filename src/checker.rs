@@ -37,7 +37,7 @@ pub enum GNCErr {
     #[error("there are duplicate local variables: {}", .0.as_str().yellow())]
     DuplicateVar(String),
 
-    #[error("")]
+    #[error("missing variable: {}", .0.as_str().yellow())]
     MissingVariable(String),
 
     #[error("void type variable is not allowed: {}", .0.as_str().yellow())]
@@ -66,17 +66,14 @@ pub enum GNCErr {
     #[error("")]
     InvalidUnary(),
 
-    #[error("")]
+    #[error("parameter count mismatch")]
     ParameterCountMismatch(String, usize, usize),
 
-    #[error("")]
-    ParameterMismatch(),
 
-    #[error("")]
+
+    #[error("invalid function call")]
     InvalidFunctionCall(),
 
-    #[error("")]
-    TypeMismatch(),
 
     /* binary expression */
     #[error("this type: {} does not support the operation: {}",
