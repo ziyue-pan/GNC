@@ -6,8 +6,11 @@ use anyhow::Result;
 #[cfg(feature = "local")]
 use checker::GNCErr;
 use std::fmt;
+#[cfg(feature = "local")]
 use inkwell::context::Context;
+#[cfg(feature = "local")]
 use inkwell::types::{BasicType};
+#[cfg(feature = "local")]
 use inkwell::AddressSpace;
 
 
@@ -28,6 +31,7 @@ pub enum GNCType {
     Pointer(Box<GNCType>),
 }
 
+#[cfg(feature = "local")]
 impl GNCType {
     // check if is pointer type
     pub fn is_ptr_ty(&self) -> bool {
