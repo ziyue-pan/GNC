@@ -687,6 +687,10 @@ impl<'ctx> CodeGen<'ctx> {
 //                dbg!("get variable pointer value");
                 self.gen_deref_variable(identifier)
             }
+            GNCAST::StringLiteral(ref s) => {
+                Ok((GNCType::Pointer(Box::new(GNCType::Char)),
+                    self.builder.build_global_string_ptr(s.as_str(), "str").as_basic_value_enum()))
+            }
             GNCAST::BoolLiteral(ref bool_literal) => {
                 Ok((GNCType::Bool, self.context.bool_type().const_int(*bool_literal as u64,
                                                                       false).as_basic_value_enum()))
@@ -848,7 +852,6 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             UnaryOperator::Dereference => {
-                // TODO dereference
                 match ty {
                     GNCType::Pointer(ref ref_ty) => {
                         Ok((*ref_ty.clone(), self.builder.build_load(v.into_pointer_value(), "deref")))
@@ -857,7 +860,6 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             UnaryOperator::Reference => {
-                // TODO reference
                 match **expr {
                     GNCAST::Identifier(ref identifier) => {
                         let var_pair = self.get_variable(identifier)?;
@@ -1043,16 +1045,14 @@ impl<'ctx> CodeGen<'ctx> {
         return match **lhs {
             GNCAST::Identifier(ref identifier) => self.get_variable(identifier),
             GNCAST::UnaryExpression(ref op, ref expr) => {
-                match op{
+                match op {
                     UnaryOperator::Dereference => {
                         let addr_pair = self.gen_expression(expr)?;
-                        dbg!(addr_pair.clone());
+//                        dbg!(addr_pair.clone());
                         Ok((addr_pair.0.deref_ptr()?, addr_pair.1.into_pointer_value()))
                     }
-//                    UnaryOperator::Reference => {}
                     _ => { Err(GNCErr::InvalidLeftValue().into()) }
                 }
-//                Ok((lpair.0, lpair.1.into_pointer_value()))
             }
             _ => { Err(GNCErr::InvalidLeftValue().into()) }
         };

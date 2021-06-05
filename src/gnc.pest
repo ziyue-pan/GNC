@@ -83,6 +83,7 @@ unary_expression = {
     float_literal |
     bool_literal |
     int_literal |
+    string_literal |
     function_call |
     identifier |
     bracket_expression |
@@ -221,6 +222,16 @@ bin_literal = @{ ^"0b" ~ ASCII_BIN_DIGIT+ }
 oct_literal = @{ ^"0o" ~ ASCII_OCT_DIGIT+ }
 hex_literal = @{ ^"0x" ~ ASCII_HEX_DIGIT+ }
 float_literal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+
+string_literal = ${ PUSH("\"") ~(str_non_escape | line_seq | str_escape )*  ~ POP }
+str_non_escape = @{
+    (!("\\" | NEWLINE | PEEK) ~ ANY)+
+}
+line_seq = @{ "\\" ~ NEWLINE }
+str_escape = ${ "\\" ~ (char_escape | hex_escape) }
+char_escape = @{ "\\" | "'" | "\"" | "n" | "r" | "t" }
+hex_escape = @{ "x" ~ ASCII_HEX_DIGIT{2} }
+
 
 
 WHITESPACE = _{ " " | "\n" | "\r" }
