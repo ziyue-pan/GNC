@@ -23,4 +23,5 @@
 - [x] pointer
 - [x] string
 - [ ] array
+- [x] `scanf()` and `printf()`
 - [ ] struct
