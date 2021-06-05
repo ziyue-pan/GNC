@@ -33,7 +33,7 @@
       "react-app/jest"
     ]
   },
-  "homepage": "https://blog.ziyuepan.tech/GNC/",
+  "homepage": "https://ziyuepan.tech/GNC/",
   "browserslist": {
     "production": [
       ">0.2%",
