@@ -85,9 +85,12 @@ unary_expression = {
     int_literal |
     function_call |
     identifier |
+    bracket_expression |
     op_arithmetic_not ~ cast_expression |
     op_logical_not ~ cast_expression |
-    op_bitwise_not ~ cast_expression
+    op_bitwise_not ~ cast_expression |
+    dereference ~ cast_expression | // dereference a pointer
+    reference ~ cast_expression     // get address
 }
 cast_expression = { "(" ~ data_type ~ ")" ~ unary_expression | unary_expression }
 multiplicative_expression = { cast_expression ~ ((op_mul | op_div | op_mod ) ~ cast_expression)* }
@@ -101,10 +104,13 @@ inclusive_or_expression = { exclusive_or_expression ~ (op_inclusive_or ~ exclusi
 logical_and_expression = { inclusive_or_expression ~ (op_logical_and ~ inclusive_or_expression)* }
 logical_or_expression = { logical_and_expression ~ (op_logical_or ~ logical_and_expression)* }
 
-assignment_expression = { identifier ~ (assign_simple | assign_div | assign_mul | assign_mod |
+
+
+assignment_expression = { unary_expression ~ (assign_simple | assign_div | assign_mul | assign_mod |
     assign_add | assign_sub | assign_shift_left | assign_shift_right | assign_bitwise_and |
     assign_exclusive_or | assign_inclusive_or) ~ expression
 }
+
 
 bracket_expression = {
     "(" ~ expression ~ ")"
@@ -164,7 +170,7 @@ assign_inclusive_or = { "|=" }
 
 
 
-possible_identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+possible_identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 identifier = @{ !keyword ~ possible_identifier }
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -200,8 +206,9 @@ double = { "double" }
 
 // void
 void = { "void" }
-
 star = { "*" }
+dereference = { "*" }
+reference = { "&" }
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

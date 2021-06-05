@@ -1,6 +1,7 @@
-use pest::iterators::{Pair};
+use pest::iterators::{Pair, Pairs};
 use serde::{Serialize};
 use types::GNCType;
+use std::fmt;
 
 #[derive(Parser, Serialize)]
 #[grammar = "./gnc.pest"]
@@ -11,7 +12,7 @@ pub struct GNCParser;
 //      All the AST Enums
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GNCParameter {
     pub param_type: GNCType,
     pub param_name: String,
@@ -22,9 +23,11 @@ pub enum UnaryOperator {
     UnaryMinus,
     LogicalNot,
     BitwiseComplement,
+    Reference,
+    Dereference,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum BinaryOperator {
     Add,
     Subtract,
@@ -117,7 +120,20 @@ pub enum GNCAST {
 
     Identifier(String),
     Declaration(GNCType, String),
-    Assignment(AssignOperation, String, Box<GNCAST>),
+    Assignment(AssignOperation, Box<GNCAST>, Box<GNCAST>),
+}
+
+
+impl fmt::Display for GNCAST {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 
@@ -351,7 +367,7 @@ fn visit_declaration_statement(pair: Pair<'_, Rule>, func_statements: &mut Vec<G
             }
             Rule::expression => {
                 func_statements.push(GNCAST::Assignment(AssignOperation::Simple,
-                                                        variable_name.clone(),
+                                                        Box::new(GNCAST::Identifier(variable_name.clone())),
                                                         Box::new(visit_expression(token))));
             }
             _ => { panic!("[ERROR] unexpected token while parsing declaration statement"); }
@@ -472,44 +488,40 @@ fn visit_cast(pair: Pair<'_, Rule>) -> GNCAST {
     let pair = pairs.next();
     let token = pair.unwrap();
 
-    if token.as_rule() == Rule::unary_expression {
-        return visit_unary(token);
+    return if token.as_rule() == Rule::unary_expression {
+        visit_unary(token)
     } else {
-        return GNCAST::CastExpression(visit_data_type(token),
-                                      Box::new(visit_unary(pairs.next().unwrap())));
+        GNCAST::CastExpression(visit_data_type(token),
+                               Box::new(visit_unary(pairs.next().unwrap())))
     }
 }
+
 
 fn visit_assignment(pair: Pair<'_, Rule>) -> GNCAST {
-    let mut lhs: String = String::new();
-    let mut assign_op = AssignOperation::Simple;
+    let mut pairs = pair.into_inner();
 
-    for token in pair.into_inner() {
-        if token.as_rule() == Rule::identifier {
-            lhs = token.as_str().to_string();
-        } else if token.as_rule() == Rule::expression {
-            let rhs = visit_expression(token);
-            let assign = GNCAST::Assignment(assign_op, lhs, Box::new(rhs));
-            return assign;
-        } else {
-            assign_op = match token.as_rule() {
-                Rule::assign_simple => AssignOperation::Simple,
-                Rule::assign_div => AssignOperation::Division,
-                Rule::assign_mul => AssignOperation::Multiplication,
-                Rule::assign_mod => AssignOperation::Modulus,
-                Rule::assign_add => AssignOperation::Addition,
-                Rule::assign_sub => AssignOperation::Subtraction,
-                Rule::assign_shift_left => AssignOperation::ShiftLeft,
-                Rule::assign_shift_right => AssignOperation::ShiftRight,
-                Rule::assign_bitwise_and => AssignOperation::BitwiseAnd,
-                Rule::assign_exclusive_or => AssignOperation::ExclusiveOr,
-                Rule::assign_inclusive_or => AssignOperation::InclusiveOr,
-                _ => { panic!(); }
-            }
-        }
-    }
-    panic!();
+    let lhs = visit_unary(pairs.next().unwrap());
+
+    let assign_op = match pairs.next().unwrap().as_rule() {
+        Rule::assign_simple => AssignOperation::Simple,
+        Rule::assign_div => AssignOperation::Division,
+        Rule::assign_mul => AssignOperation::Multiplication,
+        Rule::assign_mod => AssignOperation::Modulus,
+        Rule::assign_add => AssignOperation::Addition,
+        Rule::assign_sub => AssignOperation::Subtraction,
+        Rule::assign_shift_left => AssignOperation::ShiftLeft,
+        Rule::assign_shift_right => AssignOperation::ShiftRight,
+        Rule::assign_bitwise_and => AssignOperation::BitwiseAnd,
+        Rule::assign_exclusive_or => AssignOperation::ExclusiveOr,
+        Rule::assign_inclusive_or => AssignOperation::InclusiveOr,
+        _ => { panic!(); }
+    };
+
+    let rhs = visit_expression(pairs.next().unwrap());
+
+    GNCAST::Assignment(assign_op, Box::new(lhs), Box::new(rhs))
 }
+
 
 fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
     let mut pairs = pair.into_inner();
@@ -572,6 +584,8 @@ fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
                         Rule::op_arithmetic_not => UnaryOperator::UnaryMinus,
                         Rule::op_logical_not => UnaryOperator::LogicalNot,
                         Rule::op_bitwise_not => UnaryOperator::BitwiseComplement,
+                        Rule::dereference => UnaryOperator::Dereference,
+                        Rule::reference => UnaryOperator::Reference,
                         _ => { panic!() }
                     },
                     Box::new(visit_expression(pairs.next().unwrap())),
@@ -605,9 +619,10 @@ fn visit_function_call(pair: Pair<'_, Rule>) -> GNCAST {
 //      tokens
 //<<<<<<<<<<<<<<<<<<<<<
 fn visit_data_type(pair: Pair<'_, Rule>) -> GNCType {
-    let token = pair.into_inner().next().unwrap();
+    let mut pairs = pair.into_inner();
+    let token = pairs.next().unwrap();
 
-    match token.as_rule() {
+    let ty = match token.as_rule() {
         Rule::bool => GNCType::Bool,
         Rule::char => GNCType::Char,
         Rule::unsigned_char => GNCType::UChar,
@@ -621,7 +636,19 @@ fn visit_data_type(pair: Pair<'_, Rule>) -> GNCType {
         Rule::double => GNCType::Double,
         Rule::void => GNCType::Void,
         _ => { panic!("[ERROR] unexpected data type: {}", token.as_str()); }
-    }
+    };
+
+    return visit_star(pairs, ty);
+}
+
+fn visit_star(mut pairs: Pairs<'_, Rule>, ty: GNCType) -> GNCType {
+    let token_opt = pairs.next();
+
+    return if token_opt.is_some() {
+        GNCType::Pointer(Box::new(visit_star(pairs, ty)))
+    } else {
+        ty
+    };
 }
 
 
