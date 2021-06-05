@@ -1,4 +1,5 @@
 /.idea
+/ignore
 test/ignore/
 .DS_Store
 doc/Cover.md
