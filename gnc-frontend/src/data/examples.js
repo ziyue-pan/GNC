@@ -149,5 +149,17 @@ int foo() {
 
     return a;
 }`
+    },
+    {
+        id: 10,
+        name: 'Cast Expression',
+        code: `int cast() {
+
+    double a = 10.5;
+
+    int b = (int) a;
+
+    return b;
+}`
     }
 ]
