@@ -1,10 +1,10 @@
 use inkwell::context::Context;
-use inkwell::module::Module;
+use inkwell::module::{Module, Linkage};
 use std::path::{Path, PathBuf};
 use std::collections::{HashMap, VecDeque};
 use parser::{GNCAST, UnaryOperator, BinaryOperator, AssignOperation, GNCParameter};
 use inkwell::targets::{Target, InitializationConfig, TargetMachine, RelocMode, CodeModel, FileType};
-use inkwell::{IntPredicate, FloatPredicate};
+use inkwell::{IntPredicate, FloatPredicate, AddressSpace};
 use inkwell::OptimizationLevel;
 use inkwell::builder::Builder;
 use inkwell::values::{PointerValue, FunctionValue, BasicValue, BasicValueEnum, InstructionOpcode};
@@ -72,6 +72,20 @@ impl<'ctx> CodeGen<'ctx> {
 
     // generate all code
     pub fn gen(&mut self, ast: &Vec<GNCAST>) -> Result<()> {
+        let system_func_ty = self.context.i32_type().fn_type(
+            vec![self.context.i8_type().ptr_type(AddressSpace::Generic).as_basic_type_enum()].as_ref(), true);
+        self.module.add_function("printf", system_func_ty, Some(Linkage::External));
+        self.function_map.insert(
+            "printf".to_string(),
+            (Some(GNCType::Int), vec![GNCType::Pointer(Box::new(GNCType::Char))]),
+        );
+        self.module.add_function("scanf", system_func_ty, Some(Linkage::External));
+        self.function_map.insert(
+            "scanf".to_string(),
+            (Some(GNCType::Int), vec![GNCType::Pointer(Box::new(GNCType::Char))]),
+        );
+
+
         // first scan
         for node in ast {
             match node {
@@ -346,7 +360,11 @@ impl<'ctx> CodeGen<'ctx> {
             }
             GNCAST::FunctionCall(ref function_name,
                                  ref parameters) => {
-                self.gen_function_call(function_name, parameters)?;
+                if function_name == "scanf" || function_name == "printf" {
+                    self.gen_io(function_name, parameters)?;
+                } else {
+                    self.gen_function_call(function_name, parameters)?;
+                }
             }
             GNCAST::Assignment(ref op,
                                ref lhs,
@@ -614,12 +632,27 @@ impl<'ctx> CodeGen<'ctx> {
     //      generate expressions (type & value)
     //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+    fn gen_io(&self, function_name: &String, parameters: &Vec<GNCAST>) -> Result<(Option<GNCType>,
+                                                                                  Option<BasicValueEnum<'ctx>>)> {
+        let func_ty = self.function_map.get(function_name).unwrap();
+        let llvm_func = self.module.get_function(function_name).unwrap();
+
+        let mut compiled_args: Vec<BasicValueEnum> = Vec::with_capacity(parameters.len());
+        for arg in parameters.iter() {
+            let arg_pair = self.gen_expression(arg)?;
+            compiled_args.push(arg_pair.1);
+        }
+
+        let value = self.builder.build_call(llvm_func,
+                                            compiled_args.as_slice(),
+                                            "call io").try_as_basic_value().left();
+
+        Ok((func_ty.clone().0, value))
+    }
 
     fn gen_function_call(&self,
                          function_name: &String,
-                         parameters: &Vec<GNCAST>) -> Result<(Option<GNCType>,
-                                                              Option<BasicValueEnum<'ctx>>)> {
-//        println!("[DEBUG] generate function call");
+                         parameters: &Vec<GNCAST>) -> Result<(Option<GNCType>, Option<BasicValueEnum<'ctx>>)> {
 
         // get function and return type
         let func_ty_opt = self.function_map.get(function_name);
@@ -686,6 +719,10 @@ impl<'ctx> CodeGen<'ctx> {
             GNCAST::Identifier(ref identifier) => {
 //                dbg!("get variable pointer value");
                 self.gen_deref_variable(identifier)
+            }
+            GNCAST::StringLiteral(ref s) => {
+                Ok((GNCType::Pointer(Box::new(GNCType::Char)),
+                    self.builder.build_global_string_ptr(s.as_str(), "str").as_basic_value_enum()))
             }
             GNCAST::BoolLiteral(ref bool_literal) => {
                 Ok((GNCType::Bool, self.context.bool_type().const_int(*bool_literal as u64,
@@ -848,7 +885,6 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             UnaryOperator::Dereference => {
-                // TODO dereference
                 match ty {
                     GNCType::Pointer(ref ref_ty) => {
                         Ok((*ref_ty.clone(), self.builder.build_load(v.into_pointer_value(), "deref")))
@@ -857,7 +893,6 @@ impl<'ctx> CodeGen<'ctx> {
                 }
             }
             UnaryOperator::Reference => {
-                // TODO reference
                 match **expr {
                     GNCAST::Identifier(ref identifier) => {
                         let var_pair = self.get_variable(identifier)?;
@@ -1010,9 +1045,9 @@ impl<'ctx> CodeGen<'ctx> {
                     Ok((cast_ty, rhs_v))
                 } else if *op == BinaryOperator::Add {
                     let val_pair = if lhs_ty.is_ptr_ty() && rhs_ty.is_int_ty() {
-                        (lhs_v, rhs_v)
+                        (lhs_v, rhs_pair.1)
                     } else if lhs_ty.is_int_ty() && rhs_ty.is_ptr_ty() {
-                        (rhs_v, lhs_v)
+                        (rhs_v, lhs_pair.1)
                     } else {
                         return Err(GNCErr::InvalidOperation(cast_ty, op.clone()).into());
                     };
@@ -1043,16 +1078,14 @@ impl<'ctx> CodeGen<'ctx> {
         return match **lhs {
             GNCAST::Identifier(ref identifier) => self.get_variable(identifier),
             GNCAST::UnaryExpression(ref op, ref expr) => {
-                match op{
+                match op {
                     UnaryOperator::Dereference => {
                         let addr_pair = self.gen_expression(expr)?;
-                        dbg!(addr_pair.clone());
+//                        dbg!(addr_pair.clone());
                         Ok((addr_pair.0.deref_ptr()?, addr_pair.1.into_pointer_value()))
                     }
-//                    UnaryOperator::Reference => {}
                     _ => { Err(GNCErr::InvalidLeftValue().into()) }
                 }
-//                Ok((lpair.0, lpair.1.into_pointer_value()))
             }
             _ => { Err(GNCErr::InvalidLeftValue().into()) }
         };
@@ -1125,6 +1158,7 @@ impl<'ctx> CodeGen<'ctx> {
                 GNCType::Short | GNCType::Int | GNCType::Long => InstructionOpcode::SExt,
                 GNCType::UChar | GNCType::UShort | GNCType::UInt | GNCType::ULong => InstructionOpcode::ZExt,
                 GNCType::Float | GNCType::Double => InstructionOpcode::SIToFP,
+                GNCType::Pointer(_) => InstructionOpcode::IntToPtr,
                 _ => { return Err(GNCErr::InvalidCast(cur_ty.clone(), cast_ty.clone()).into()); }
             }
             GNCType::UChar => match cast_ty {
@@ -1132,6 +1166,7 @@ impl<'ctx> CodeGen<'ctx> {
                 GNCType::Short | GNCType::Int | GNCType::Long | GNCType::UShort | GNCType::UInt | GNCType::ULong =>
                     InstructionOpcode::ZExt,
                 GNCType::Float | GNCType::Double => InstructionOpcode::UIToFP,
+                GNCType::Pointer(_) => InstructionOpcode::IntToPtr,
                 _ => { return Err(GNCErr::InvalidCast(cur_ty.clone(), cast_ty.clone()).into()); }
             }
             GNCType::Short => match cast_ty {

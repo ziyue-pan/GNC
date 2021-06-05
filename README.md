@@ -12,17 +12,15 @@
 - [x] unary operation  
 - [x] binary operation
 - [x] conditional statement
+- [ ] switch
 - [x] loop statement
 - [x] scope 
 - [x] function
 - [x] global variable
 - [x] more types
 - [x] cast expression
-- [ ] pointer
+- [ ] const  
+- [x] pointer
+- [x] string
 - [ ] array
-- [ ] string
 - [ ] struct
-- [ ] struct with function
-
-
-

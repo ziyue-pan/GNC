@@ -117,6 +117,7 @@ pub enum GNCAST {
     BoolLiteral(bool),
     IntLiteral(i64),
     FloatLiteral(f64),
+    StringLiteral(String),
 
     Identifier(String),
     Declaration(GNCType, String),
@@ -493,7 +494,7 @@ fn visit_cast(pair: Pair<'_, Rule>) -> GNCAST {
     } else {
         GNCAST::CastExpression(visit_data_type(token),
                                Box::new(visit_unary(pairs.next().unwrap())))
-    }
+    };
 }
 
 
@@ -566,33 +567,30 @@ fn visit_binary(pair: Pair<'_, Rule>) -> GNCAST {
 
 fn visit_unary(pair: Pair<'_, Rule>) -> GNCAST {
     let mut pairs = pair.into_inner();
-    let pair = pairs.next();
 
-    if pair.is_some() {
-        let expr = pair.unwrap();
+    let expr = pairs.next().unwrap();
 
-        return match expr.as_rule() {
-            Rule::bool_literal => visit_bool_literal(expr),
-            Rule::float_literal => visit_float_literal(expr),
-            Rule::int_literal => visit_int_literal(expr),
-            Rule::bracket_expression => visit_expression(expr.into_inner().next().unwrap()),
-            Rule::function_call => visit_function_call(expr),
-            Rule::identifier => GNCAST::Identifier(expr.as_str().to_string()),
-            _ =>
-                GNCAST::UnaryExpression(
-                    match expr.as_rule() {
-                        Rule::op_arithmetic_not => UnaryOperator::UnaryMinus,
-                        Rule::op_logical_not => UnaryOperator::LogicalNot,
-                        Rule::op_bitwise_not => UnaryOperator::BitwiseComplement,
-                        Rule::dereference => UnaryOperator::Dereference,
-                        Rule::reference => UnaryOperator::Reference,
-                        _ => { panic!() }
-                    },
-                    Box::new(visit_expression(pairs.next().unwrap())),
-                )
-        };
-    }
-    panic!("")
+    return match expr.as_rule() {
+        Rule::bool_literal => visit_bool_literal(expr),
+        Rule::float_literal => visit_float_literal(expr),
+        Rule::int_literal => visit_int_literal(expr),
+        Rule::string_literal => visit_string_literal(expr),
+        Rule::bracket_expression => visit_expression(expr.into_inner().next().unwrap()),
+        Rule::function_call => visit_function_call(expr),
+        Rule::identifier => GNCAST::Identifier(expr.as_str().to_string()),
+        _ =>
+            GNCAST::UnaryExpression(
+                match expr.as_rule() {
+                    Rule::op_arithmetic_not => UnaryOperator::UnaryMinus,
+                    Rule::op_logical_not => UnaryOperator::LogicalNot,
+                    Rule::op_bitwise_not => UnaryOperator::BitwiseComplement,
+                    Rule::dereference => UnaryOperator::Dereference,
+                    Rule::reference => UnaryOperator::Reference,
+                    _ => { panic!() }
+                },
+                Box::new(visit_expression(pairs.next().unwrap())),
+            )
+    };
 }
 
 
@@ -686,6 +684,41 @@ fn visit_int_literal(pair: Pair<'_, Rule>) -> GNCAST {
         }
         _ => { panic!("cannot parse int literal") }
     }
+}
+
+fn visit_string_literal(pair: Pair<'_, Rule>) -> GNCAST {
+    let mut s = String::new();
+
+    for token in pair.into_inner() {
+        match token.as_rule() {
+            Rule::str_non_escape => s.push_str(token.as_str()),
+            Rule::str_escape => {
+                let escape_token = token.into_inner().next().unwrap();
+                dbg!(escape_token.as_str());
+
+                s.push(match escape_token.as_rule() {
+
+                    Rule::char_escape => match escape_token.as_str() {
+                        "\\" => '\\',
+                        "\'" => '\'',
+                        "\"" => '\"',
+                        "n" => '\n',
+                        "r" => '\r',
+                        "t" => '\t',
+                        _ => { panic!() },
+                    }
+                    Rule::hex_escape => {
+                        let e = escape_token.as_str();
+                        u8::from_str_radix(&e[2..e.len()], 16).unwrap().into()
+                    }
+                    _ => { panic!() }
+                });
+            }
+            _ => {}
+        }
+    }
+
+    return GNCAST::StringLiteral(s);
 }
 
 // bool literal

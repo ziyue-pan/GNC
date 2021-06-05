@@ -57,11 +57,11 @@ impl GNCType {
         }
     }
 
-    pub fn deref_ptr(&self) -> Result<(GNCType)> {
+    pub fn deref_ptr(&self) -> Result<GNCType> {
         return match self {
             GNCType::Pointer(ref ty) => Ok(*ty.clone()),
             _ => { Err(GNCErr::DereferenceNonPointer(self.clone()).into()) }
-        }
+        };
     }
 }
 
