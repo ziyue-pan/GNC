@@ -1012,9 +1012,9 @@ impl<'ctx> CodeGen<'ctx> {
                     Ok((cast_ty, rhs_v))
                 } else if *op == BinaryOperator::Add {
                     let val_pair = if lhs_ty.is_ptr_ty() && rhs_ty.is_int_ty() {
-                        (lhs_v, rhs_v)
+                        (lhs_v, rhs_pair.1)
                     } else if lhs_ty.is_int_ty() && rhs_ty.is_ptr_ty() {
-                        (rhs_v, lhs_v)
+                        (rhs_v, lhs_pair.1)
                     } else {
                         return Err(GNCErr::InvalidOperation(cast_ty, op.clone()).into());
                     };
@@ -1125,6 +1125,7 @@ impl<'ctx> CodeGen<'ctx> {
                 GNCType::Short | GNCType::Int | GNCType::Long => InstructionOpcode::SExt,
                 GNCType::UChar | GNCType::UShort | GNCType::UInt | GNCType::ULong => InstructionOpcode::ZExt,
                 GNCType::Float | GNCType::Double => InstructionOpcode::SIToFP,
+                GNCType::Pointer(_) => InstructionOpcode::IntToPtr,
                 _ => { return Err(GNCErr::InvalidCast(cur_ty.clone(), cast_ty.clone()).into()); }
             }
             GNCType::UChar => match cast_ty {
@@ -1132,6 +1133,7 @@ impl<'ctx> CodeGen<'ctx> {
                 GNCType::Short | GNCType::Int | GNCType::Long | GNCType::UShort | GNCType::UInt | GNCType::ULong =>
                     InstructionOpcode::ZExt,
                 GNCType::Float | GNCType::Double => InstructionOpcode::UIToFP,
+                GNCType::Pointer(_) => InstructionOpcode::IntToPtr,
                 _ => { return Err(GNCErr::InvalidCast(cur_ty.clone(), cast_ty.clone()).into()); }
             }
             GNCType::Short => match cast_ty {

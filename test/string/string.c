@@ -3,6 +3,8 @@ int main() {
 
 //    printf("%s", s);
 
+    char c = *(s + 2);
+
     return 0;
 }
 
