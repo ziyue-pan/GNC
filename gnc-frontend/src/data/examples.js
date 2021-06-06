@@ -161,5 +161,16 @@ int foo() {
 
     return b;
 }`
+    },
+    {
+        id: 11,
+        name: 'String & Output',
+        code: `int main() {
+    char* s = "String Test";
+
+    printf("%s", s);
+
+    return 0;
+}`
     }
 ]

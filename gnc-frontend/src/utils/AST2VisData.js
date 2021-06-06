@@ -33,6 +33,7 @@ export default function AST2VisualizationData(ast) {
                     case "IntLiteral":
                     case "BoolLiteral":
                     case "FloatLiteral":
+                    case "StringLiteral":
                         treeNode.attrs = {
                             value: node[x]
                         }
