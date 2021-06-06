@@ -1,4 +1,4 @@
-# GNC [WIP]
+# GNC
 
 [![Build And Test](https://github.com/PAN-Ziyue/GNC/workflows/CI/badge.svg?event=push)](https://github.com/PAN-Ziyue/GNC/actions?workflow=CI)
 
@@ -29,14 +29,15 @@
 ### GNC Cli
 
 ```bash
-cargo build --package GNC --bin GNC
+$ cargo build --package GNC --bin GNC
 ```
 
 ### GNC Online
 
 ```bash
-yarn
-yarn build
+$ cd forntend
+$ yarn
+$ yarn build
 ```
 
 ## Test
@@ -45,14 +46,14 @@ yarn build
 
 ```bash
 # clone THU's minidecaf-test cases as submodule
-git submodule init && git submodule update
+$ git submodule init && git submodule update
 # install zx
-npm i -g zx
+$ npm i -g zx
 ```
 
 ### Run
 
 ```bash
-cd test
-zx ./minidecaf-test.mjs
+$ cd test
+$ zx ./minidecaf-test.mjs
 ```

@@ -13,3 +13,7 @@ int div() {
     int a = 3 / b;
     return b;
 }
+
+int main() {
+    return 1 || 0 && 2;
+}

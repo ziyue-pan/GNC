@@ -29,8 +29,8 @@ function_parameter = { data_type ~ identifier }
 block_statement = { "{" ~ statement* ~ "}" }
 
 statement = {
-    continue_statement |
-    break_statement |
+    continue_statement ~ ";" |
+    break_statement ~ ";" |
     declaration_statement ~ ";" |
     return_statement ~ ";" |
     expression? ~ ";" | // assignment
@@ -44,8 +44,8 @@ statement = {
 
 // declaration statement
 declaration_statement = {
-    data_type ~ (identifier ~ ("[" ~ int_literal ~ "]")* ~ ("=" ~ expression)?) ~
-    ("," ~ (identifier ~ ("[" ~ int_literal ~ "]")* ~ ("=" ~ expression)?))*     // declaration
+    data_type ~ (identifier  ~ ("=" ~ expression)?) ~
+    ("," ~ (identifier ~ ("=" ~ expression)?))*     // declaration
 }
 
 return_statement = { "return" ~ expression? }
@@ -146,7 +146,7 @@ op_lt = { "<" }
 op_gt = { ">" }
 op_eq = { "==" }
 op_ne = { "!=" }
-op_bitwise_and = { "&" }
+op_bitwise_and = { "&" ~ !"&" }
 op_exclusive_or = { "^" }
 op_inclusive_or = { "|" }
 op_logical_and = { "&&" }
@@ -165,7 +165,8 @@ assign_bitwise_and = { "&=" }
 assign_exclusive_or = { "^=" }
 assign_inclusive_or = { "|=" }
 
-
+dereference = { "*" }
+reference = { "&" }
 
 possible_identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 identifier = @{ !keyword ~ possible_identifier }
@@ -204,8 +205,6 @@ double = { "double" }
 // void
 void = { "void" }
 star = { "*" }
-dereference = { "*" }
-reference = { "&" }
 
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -239,7 +238,6 @@ COMMENT = _{
 //>>>>>>>>>>>>>>>>>>>>
 //      keywords
 //<<<<<<<<<<<<<<<<<<<<
-
 
 keyword = {
     "char" |
