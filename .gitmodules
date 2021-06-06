@@ -1,3 +1,0 @@
-[submodule "test/minidecaf-tests"]
-	path = test/minidecaf-tests
-	url = https://github.com/decaf-lang/minidecaf-tests
