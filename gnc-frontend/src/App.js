@@ -1,12 +1,14 @@
 import './App.css';
 import {useEffect, useState} from "react";
-import {Button, Card, CardLabelText, Footer, Header, Input, Title} from "./components/Basic"
+import {Button, Card, CardLabelText, Footer, Header, TextArea, Title} from "./components/Basic"
+import Logger from './utils/Logger'
 import MonacoEditor from "@monaco-editor/react";
 import AntVTree from "./components/AntVG6";
 import DropMenu from "./components/DropMenu";
 import Modal from "./components/Modal";
 import {compile_result} from "gnc";
 import AST2VisualizationData from "./utils/AST2VisData";
+import evalAST from "./utils/HLVM";
 import {ExampleOptions} from "./data/examples";
 import useWindowSize from "./hook/useWindowSize";
 
@@ -24,12 +26,16 @@ const VisOptions = [
 function App() {
     // visualization hooks
     const [parseTree, setParseTree] = useState({id: '0', label: 'GNC'})
-    const [AST, setAST] = useState({id: '0', label: 'GNC'})
+    const [ast, setAST] = useState(null)
+    const [visAST, setVisAST] = useState({id: '0', label: 'GNC'})
     const [visMode, setVisMode] = useState(VisOptions[0])
 
     // code hooks
     const [exampleCode, setExampleCode] = useState(ExampleOptions[0])
     const [code, editCode] = useState(exampleCode.code)
+
+    // stdout hooks
+    const [output, setOutput] = useState(`[INFO] Compile the code before running!`)
 
     // modal hooks
     const [isWarning, setIsWarning] = useState(false)
@@ -41,22 +47,46 @@ function App() {
     const windowSize = useWindowSize()
     const [lastWindowSize, setLastWindowSize] = useState([0, 0])
 
+    const handleExampleCodeChange = (option) => {
+        setExampleCode(option)
+        editCode(option.code)
+    }
+
+    const appendOutput = (data) => {
+        setOutput(`${output}\n${data}`)
+    }
+
+    const showModal = (isError, title, content) => {
+        setIsWarning(!isError)
+        setErrorTitle(title)
+        setErrorContent(content)
+        setShowError(true)
+    }
+
     const compile = () => {
         let data = JSON.parse(compile_result(code))
         if (!data.error) {
             setParseTree(data['parse_tree'])
-            setAST(AST2VisualizationData(data['ast']))
+            setAST(data['ast'])
+            setVisAST(AST2VisualizationData(data['ast']))
+            appendOutput(Logger.Info('Finished Compiling'))
         } else {
-            setIsWarning(false)
-            setErrorTitle('Compilation Error')
-            setErrorContent(data['error_message'])
-            setShowError(true)
+            setAST(null)
+            appendOutput(Logger.Error('Compilation Error') + '\n' + data['error_message'])
+            showModal(true, 'Compilation Error', data['error_message'])
         }
     }
 
-    const handleExampleCodeChange = (option) => {
-        setExampleCode(option)
-        editCode(option.code)
+    const run = () => {
+        try {
+            const res = evalAST(ast, 'main', [])
+            // eslint-disable-next-line no-unused-vars
+            const {type, value, stdout} = res
+            appendOutput(Logger.Info('Finished Running') + '\n' + stdout + '\nExited with code ' + value)
+        } catch (e) {
+            appendOutput(Logger.Error('Runtime Error') + '\n' + e.message)
+            showModal(true, 'Runtime Error', e.message)
+        }
     }
 
     useEffect(() => {
@@ -69,10 +99,7 @@ function App() {
         const [width, height] = windowSize
         if (width < lastWidth || height < lastHeight) {
             if (!showError) {
-                setIsWarning(true)
-                setErrorTitle('Detected Window Shrink!')
-                setErrorContent('We detected a window shrink on your browser, please refresh to get better experience.')
-                setShowError(true)
+                showModal(false, 'Detected Window Shrink!', 'We detected a window shrink on your browser, please refresh to get better experience.')
             }
         }
         setLastWindowSize(windowSize)
@@ -121,16 +148,6 @@ function App() {
                             onChange={editCode}
                             value={code}
                         />
-                        // <Editor
-                        //     value={code}
-                        //     onValueChange={editCode}
-                        //     highlight={code => highlight(code, languages.c)}
-                        //     padding={10}
-                        //     style={{
-                        //         fontFamily: 'monospace',
-                        //         fontSize: 12,
-                        //     }}
-                        // />
                     }
                 />
                 <Card
@@ -152,21 +169,15 @@ function App() {
                     }
                     content={
                         <AntVTree
-                            data={(visMode.id === 1) ? parseTree : AST}
+                            data={(visMode.id === 1) ? parseTree : visAST}
                         />
                     }
                 />
                 <Card
                     left={<CardLabelText>Running Result</CardLabelText>}
-                    right={<Button>Run</Button>}
+                    right={<Button onClick={run}>Run</Button>}
                     content={
-                        <div>
-                            function: `main()`
-                            <br/>
-                            a: <Input/>
-                            <br/>
-                            res: 23333
-                        </div>
+                        <TextArea value={output}/>
                     }
                 />
             </div>

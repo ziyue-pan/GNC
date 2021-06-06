@@ -164,7 +164,7 @@ int foo() {
     },
     {
         id: 11,
-        name: 'String & Output',
+        name: 'String',
         code: `int main() {
     char* s = "String Test";
 
