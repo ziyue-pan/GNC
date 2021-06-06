@@ -63,7 +63,7 @@ pub enum GNCErr {
     ReferenceNonVariable(),
 
     /* unary expression */
-    #[error("")]
+    #[error("invalid unary operation")]
     InvalidUnary(),
 
     #[error("parameter count mismatch")]
@@ -80,7 +80,7 @@ pub enum GNCErr {
     .0.to_string().as_str().yellow(), .1.to_string().as_str().yellow())]
     InvalidOperation(GNCType, BinaryOperator),
 
-    #[error("")]
+    #[error("return type mismatch")]
     ReturnTypeMismatch(),
 
     #[error(transparent)]
