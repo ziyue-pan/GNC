@@ -155,6 +155,9 @@ export default function evalAST(ast, entryPoint, args) {
                     // declarations
                     case "Declaration":
                         const [type, name] = node[x]
+                        if (name in symbolTable.slice().reverse()[0]) {
+                            throw new Error(`${name} already declared`)
+                        }
                         symbolTable.slice(-1)[0][name] = {
                             type,
                             value: 0
