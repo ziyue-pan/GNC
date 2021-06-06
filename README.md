@@ -45,8 +45,6 @@ $ yarn build
 ### Environment
 
 ```bash
-# clone THU's minidecaf-test cases as submodule
-$ git submodule init && git submodule update
 # install zx
 $ npm i -g zx
 ```

@@ -2,3 +2,4 @@
 *.bc
 *.ll
 *.s
+batch-tests

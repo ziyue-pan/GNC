@@ -1,5 +1,6 @@
 #!/usr/bin/env zx
 const fs = require('fs')
+
 const gncBinary = '../target/release/GNC'
 
 let totalCount = 0
@@ -7,7 +8,7 @@ let passCount = 0
 let failList = []
 
 // Pass cases
-const passCasePath = './minidecaf-tests/testcases/step'
+const passCasePath = './batch-tests/testcases/step'
 for (let i = 1; i <= 12; i++) {
     const dir = await fs.promises.opendir(`${passCasePath}${i}`)
     for await (const dirent of dir) {
@@ -48,7 +49,7 @@ for (let i = 1; i <= 12; i++) {
 }
 
 // Fail cases
-const failCasePath = './minidecaf-tests/failcases/step'
+const failCasePath = './batch-tests/failcases/step'
 for (let i = 1; i <= 12; i++) {
     let dir = null
     try {
