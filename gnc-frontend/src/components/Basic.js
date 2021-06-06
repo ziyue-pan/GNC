@@ -31,6 +31,11 @@ export const Input = styled.input.attrs({
     className: "text-green-900 rounded-lg shadow-md border-2 border-green-500"
 })``;
 
+export const TextArea = styled.textarea.attrs({
+    disabled: true,
+    className: "flex w-full h-full resize-none"
+})``;
+
 const CardContainer = styled.div.attrs({
     className: "flex flex-auto container w-full lg:w-1/3 p-2"
 })`
