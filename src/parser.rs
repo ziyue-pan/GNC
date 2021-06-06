@@ -86,6 +86,9 @@ pub enum GNCAST {
     // Function AST: return type, name, parameter list and code block
     Function(GNCType, String, Vec<GNCParameter>, Vec<GNCAST>),
 
+    // Global Variable
+    GlobalDeclaration(GNCType, String, Box<GNCAST>),
+
     // If Statement AST: expression, if-statement-list, else_statements
     IfStatement(Box<GNCAST>, Box<GNCAST>, Box<GNCAST>),
 
@@ -96,32 +99,26 @@ pub enum GNCAST {
     //      To support declaration in the init clause, we have
     // to set the first parameter as Vec.
     ForStatement(Vec<GNCAST>, Box<Option<GNCAST>>, Box<Option<GNCAST>>, Box<GNCAST>),
+    Declaration(GNCType, String),
 
     // Statements block: (a new scope)
     BlockStatement(Vec<GNCAST>),
-
-    // Function Call:
-    FunctionCall(String, Vec<GNCAST>),
-
-    // Global Variable
-    GlobalDeclaration(GNCType, String, Box<GNCAST>),
-
     ContinueStatement,
     BreakStatement,
     ReturnStatement(Box<Option<GNCAST>>),
+
+    FunctionCall(String, Vec<GNCAST>),
     CastExpression(GNCType, Box<GNCAST>),
     UnaryExpression(UnaryOperator, Box<GNCAST>),
     BinaryExpression(BinaryOperator, Box<GNCAST>, Box<GNCAST>),
+    Assignment(AssignOperation, Box<GNCAST>, Box<GNCAST>),
 
     // Literals
     BoolLiteral(bool),
     IntLiteral(i64),
+    Identifier(String),
     FloatLiteral(f64),
     StringLiteral(String),
-
-    Identifier(String),
-    Declaration(GNCType, String),
-    Assignment(AssignOperation, Box<GNCAST>, Box<GNCAST>),
 }
 
 

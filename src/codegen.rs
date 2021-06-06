@@ -21,16 +21,15 @@ use types::GNCType;
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 pub struct CodeGen<'ctx> {
     source_path: &'ctx str,
-    // module_name: String,
     context: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
-    addr_map_stack: Vec<HashMap<String, (GNCType, PointerValue<'ctx>)>>,
 
     //>>>>>>>>>>>>>>>>>>>>>>>>
     //      LLVM Blocks
     //<<<<<<<<<<<<<<<<<<<<<<<<
 
+    addr_map_stack: Vec<HashMap<String, (GNCType, PointerValue<'ctx>)>>,
     // current function block
     current_function: Option<(FunctionValue<'ctx>, Option<GNCType>)>,
     // break labels (in loop statements)
@@ -194,7 +193,6 @@ impl<'ctx> CodeGen<'ctx> {
                           ret_type: &GNCType,
                           func_name: &String,
                           func_param: &Vec<GNCParameter>) -> Result<()> {
-//        println!("[DEBUG] generate function protocol");
 
         // cannot handle duplicate function
         if self.function_map.contains_key(func_name) {
@@ -234,16 +232,11 @@ impl<'ctx> CodeGen<'ctx> {
                         func_name: &String,
                         func_param: &Vec<GNCParameter>,
                         func_body: &Vec<GNCAST>) -> Result<()> {
-//        println!("[DEBUG] generate function definition");
+        let func = self.module.get_function(func_name.as_str()).unwrap();
         // push local map
         let local_map: HashMap<String, (GNCType, PointerValue<'ctx>)> = HashMap::new();
         self.addr_map_stack.push(local_map);
 
-        let func_option = self.module.get_function(func_name.as_str());
-        if func_option.is_none() {
-            panic!();
-        }
-        let func = func_option.unwrap();
         let func_ty = self.function_map.get(func_name).unwrap().to_owned().0;
         self.current_function = Some((func, func_ty));
 
