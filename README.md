@@ -20,7 +20,7 @@
 - [x] cast expression
 - [x] pointer
 - [x] string
-- [x] `scanf()` and `printf
+- [x] `scanf()` and `printf()`
 
 ## Other Features
 
