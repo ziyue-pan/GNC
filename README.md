@@ -20,9 +20,15 @@
 - [x] cast expression
 - [x] pointer
 - [x] string
-- [ ] array
-- [x] `scanf()` and `printf()`
-- [ ] struct
+- [x] `scanf()` and `printf
+
+## Other Features
+
+- [x] Pest as frontend
+- [x] LLVM as backend
+- [x] Parse tree and AST visualization using AntV
+- [x] HLVM (High Level Virtual Machine Interpreter)
+- [x] Full compiler capabilities in the browser using WASM
 
 ## Build
 
